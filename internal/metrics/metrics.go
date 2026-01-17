@@ -8,6 +8,19 @@ import (
 	"time"
 )
 
+// Collector はメトリクス収集の基本操作を定義するインターフェース
+type Collector interface {
+	RecordSuccess(latency time.Duration)
+	RecordFailure(latency time.Duration)
+	TotalRequests() uint64
+	SuccessRequests() uint64
+	FailedRequests() uint64
+	Snapshot() Snapshot
+}
+
+// Ensure Metrics implements Collector
+var _ Collector = (*Metrics)(nil)
+
 // Metrics はリクエストのメトリクスを収集する
 type Metrics struct {
 	totalRequests   atomic.Uint64

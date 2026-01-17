@@ -9,6 +9,18 @@ import (
 	"chaos-kvs/internal/logger"
 )
 
+// Store はKVSの基本操作を定義するインターフェース
+type Store interface {
+	Get(key string) ([]byte, bool)
+	Set(key string, value []byte) error
+	Delete(key string) error
+	Keys() []string
+	Size() int
+}
+
+// Ensure Node implements Store
+var _ Store = (*Node)(nil)
+
 // Status はノードの状態を表す
 type Status int
 
