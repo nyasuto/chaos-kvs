@@ -118,10 +118,13 @@ func (c *Client) createJob(n *node.Node, key string, isWrite bool) worker.Job {
 
 		if isWrite {
 			value := make([]byte, c.config.ValueSize)
-			_, _ = cryptorand.Read(value)
+			if _, randErr := cryptorand.Read(value); randErr != nil {
+				logger.Warn("", "Failed to generate random value: %v", randErr)
+			}
 			err = n.Set(key, value)
 		} else {
-			_, _ = n.Get(key)
+			// Get: 存在確認のみ、値は使用しない
+			n.Get(key)
 		}
 
 		latency := time.Since(start)
@@ -140,8 +143,8 @@ func (c *Client) Stop() {
 	}
 
 	c.cancel()
-	c.pool.Stop()
 	c.wg.Wait()
+	c.pool.Stop()
 
 	logger.Info("", "Client stopped")
 }

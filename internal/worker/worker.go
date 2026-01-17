@@ -80,10 +80,18 @@ func (p *Pool) Submit(job Job) (submitted bool) {
 	}
 
 	defer func() {
-		if recover() != nil {
+		if r := recover(); r != nil {
+			logger.Warn("", "Submit failed due to panic (channel may be closed): %v", r)
 			submitted = false
 		}
 	}()
+
+	// 先にコンテキストをチェック
+	select {
+	case <-p.ctx.Done():
+		return false
+	default:
+	}
 
 	select {
 	case <-p.ctx.Done():

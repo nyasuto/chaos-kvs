@@ -36,8 +36,9 @@ func main() {
 
 	// デモ: データの読み書き
 	if node, ok := c.GetNode("node-1"); ok {
-		_ = node.Set("hello", []byte("world"))
-		if value, exists := node.Get("hello"); exists {
+		if err := node.Set("hello", []byte("world")); err != nil {
+			logger.Error(node.ID(), "Failed to set 'hello': %v", err)
+		} else if value, exists := node.Get("hello"); exists {
 			logger.Info(node.ID(), "Get 'hello' = '%s'", string(value))
 		}
 	}
@@ -54,6 +55,8 @@ func main() {
 
 	fmt.Println()
 	logger.Info("", "Shutting down...")
-	_ = c.StopAll()
+	if err := c.StopAll(); err != nil {
+		logger.Warn("", "Error during shutdown: %v", err)
+	}
 	logger.Info("", "Goodbye!")
 }
