@@ -1,0 +1,25 @@
+# ChaosKVS シナリオ設定ファイルの例
+scenario:
+  name: custom-resilience-test
+  description: カスタム耐障害性テスト
+  duration: 30s
+  node_count: 5
+
+  client:
+    workers: 20
+    write_ratio: 0.5  # 50% Write, 50% Read
+
+  chaos:
+    enabled: true
+    interval: 3s
+    targets: 1
+    attack_types:
+      - kill
+      - suspend
+    suspend_time: 5s
+    delay_amount: 100ms
+
+  recovery:
+    enabled: true
+    delay: 2s
+    max_retries: 3
