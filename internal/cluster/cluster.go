@@ -63,7 +63,9 @@ func (c *Cluster) RemoveNode(nodeID string) error {
 	}
 
 	if n.Status() == node.StatusRunning {
-		_ = n.Stop()
+		if err := n.Stop(); err != nil {
+			logger.Warn("", "Failed to stop node %s during removal: %v", nodeID, err)
+		}
 	}
 
 	delete(c.nodes, nodeID)

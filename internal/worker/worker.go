@@ -4,6 +4,7 @@ import (
 	"context"
 	"runtime"
 	"sync"
+	"sync/atomic"
 
 	"chaos-kvs/internal/logger"
 )
@@ -19,6 +20,7 @@ type Pool struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
 	started    bool
+	stopping   atomic.Bool
 	mu         sync.Mutex
 }
 
@@ -73,11 +75,23 @@ func (p *Pool) worker(_ int) {
 
 // Submit はジョブをプールに送信する
 func (p *Pool) Submit(job Job) (submitted bool) {
+	if p.stopping.Load() {
+		return false
+	}
+
 	defer func() {
-		if recover() != nil {
+		if r := recover(); r != nil {
+			logger.Warn("", "Submit failed due to panic (channel may be closed): %v", r)
 			submitted = false
 		}
 	}()
+
+	// 先にコンテキストをチェック
+	select {
+	case <-p.ctx.Done():
+		return false
+	default:
+	}
 
 	select {
 	case <-p.ctx.Done():
@@ -89,6 +103,10 @@ func (p *Pool) Submit(job Job) (submitted bool) {
 
 // SubmitWait はジョブを送信し、キューに空きがなければブロックする
 func (p *Pool) SubmitWait(job Job) bool {
+	if p.stopping.Load() {
+		return false
+	}
+
 	select {
 	case <-p.ctx.Done():
 		return false
@@ -112,12 +130,14 @@ func (p *Pool) Stop() {
 	}
 	p.mu.Unlock()
 
+	p.stopping.Store(true)
 	p.cancel()
-	close(p.jobs)
 	p.wg.Wait()
+	close(p.jobs)
 
 	p.mu.Lock()
 	p.started = false
+	p.stopping.Store(false)
 	p.mu.Unlock()
 
 	logger.Info("", "WorkerPool stopped")
