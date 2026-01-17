@@ -61,7 +61,7 @@ func (n *Node) Start(ctx context.Context) error {
 	n.ctx, n.cancel = context.WithCancel(ctx)
 	n.status = NodeStatusRunning
 
-	fmt.Printf("[INFO] Node %s started\n", n.ID)
+	LogInfo(n.ID, "Node started")
 	return nil
 }
 
@@ -79,7 +79,7 @@ func (n *Node) Stop() error {
 	}
 	n.status = NodeStatusStopped
 
-	fmt.Printf("[INFO] Node %s stopped\n", n.ID)
+	LogInfo(n.ID, "Node stopped")
 	return nil
 }
 

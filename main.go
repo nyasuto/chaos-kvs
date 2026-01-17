@@ -15,29 +15,41 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// デモ: 単一ノードの起動
-	node := NewNode("node-1")
-	if err := node.Start(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to start node: %v\n", err)
+	// クラスタの作成
+	cluster := NewCluster()
+
+	// 5つのノードを作成
+	if err := cluster.CreateNodes(5, "node"); err != nil {
+		LogError("", "Failed to create nodes: %v", err)
+		os.Exit(1)
+	}
+
+	// 全ノードを起動
+	if err := cluster.StartAll(ctx); err != nil {
+		LogError("", "Failed to start cluster: %v", err)
 		os.Exit(1)
 	}
 
 	// デモ: データの読み書き
-	_ = node.Set("hello", []byte("world"))
-	if value, ok := node.Get("hello"); ok {
-		fmt.Printf("[INFO] Get 'hello' = '%s'\n", string(value))
+	if node, ok := cluster.GetNode("node-1"); ok {
+		_ = node.Set("hello", []byte("world"))
+		if value, exists := node.Get("hello"); exists {
+			LogInfo(node.ID, "Get 'hello' = '%s'", string(value))
+		}
 	}
 
-	fmt.Printf("[INFO] Node %s is running with %d keys\n", node.ID, node.Size())
+	LogInfo("", "Cluster running: %d nodes, %d running",
+		cluster.Size(), cluster.RunningCount())
 
 	// シグナル待機
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
-	fmt.Println("[INFO] Press Ctrl+C to stop...")
+	fmt.Println("\nPress Ctrl+C to stop...")
 	<-sigCh
 
-	fmt.Println("\n[INFO] Shutting down...")
-	_ = node.Stop()
-	fmt.Println("[INFO] Goodbye!")
+	fmt.Println()
+	LogInfo("", "Shutting down...")
+	_ = cluster.StopAll()
+	LogInfo("", "Goodbye!")
 }
