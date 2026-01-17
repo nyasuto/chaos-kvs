@@ -9,7 +9,9 @@ import (
 	"chaos-kvs/internal/chaos"
 	"chaos-kvs/internal/client"
 	"chaos-kvs/internal/cluster"
+	"chaos-kvs/internal/events"
 	"chaos-kvs/internal/logger"
+	"chaos-kvs/internal/metrics"
 	"chaos-kvs/internal/recovery"
 )
 
@@ -84,7 +86,8 @@ type Result struct {
 
 // Engine はシナリオ実行エンジン
 type Engine struct {
-	config Config
+	config   Config
+	eventBus *events.Bus
 
 	cluster  *cluster.Cluster
 	client   *client.Client
@@ -100,6 +103,11 @@ func New(config Config) *Engine {
 	return &Engine{
 		config: config,
 	}
+}
+
+// SetEventBus はイベントバスを設定する
+func (e *Engine) SetEventBus(bus *events.Bus) {
+	e.eventBus = bus
 }
 
 // Run はシナリオを実行する
@@ -172,6 +180,9 @@ func (e *Engine) setup(ctx context.Context) error {
 		chaosConfig.TargetCount = e.config.ChaosTargets
 		chaosConfig.AttackTypes = e.config.AttackTypes
 		e.monkey = chaos.New(e.cluster, chaosConfig)
+		if e.eventBus != nil {
+			e.monkey.SetEventBus(e.eventBus)
+		}
 	}
 
 	// 復旧マネージャー
@@ -180,6 +191,9 @@ func (e *Engine) setup(ctx context.Context) error {
 		recoveryConfig.RecoveryDelay = e.config.RecoveryDelay
 		recoveryConfig.MaxRetries = e.config.MaxRetries
 		e.recovery = recovery.New(e.cluster, recoveryConfig)
+		if e.eventBus != nil {
+			e.recovery.SetEventBus(e.eventBus)
+		}
 	}
 
 	return nil
@@ -318,4 +332,44 @@ func (e *Engine) IsRunning() bool {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	return e.running
+}
+
+// ChaosStats はカオス統計を返す
+func (e *Engine) ChaosStats() *chaos.Stats {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.monkey == nil {
+		return nil
+	}
+	stats := e.monkey.Stats()
+	return &stats
+}
+
+// RecoveryStats は復旧統計を返す
+func (e *Engine) RecoveryStats() *recovery.Stats {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.recovery == nil {
+		return nil
+	}
+	stats := e.recovery.Stats()
+	return &stats
+}
+
+// Metrics はクライアントメトリクスを返す
+func (e *Engine) Metrics() *metrics.Snapshot {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.client == nil {
+		return nil
+	}
+	snapshot := e.client.Metrics().Snapshot()
+	return &snapshot
+}
+
+// Cluster はクラスタを返す
+func (e *Engine) Cluster() *cluster.Cluster {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.cluster
 }
