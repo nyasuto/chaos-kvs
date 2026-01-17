@@ -43,42 +43,43 @@
             color: white;
         }
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 2rem;
         }
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.5rem;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
             margin-bottom: 2rem;
         }
         .card {
             background: #16213e;
             border-radius: 12px;
-            padding: 1.5rem;
+            padding: 1.25rem;
             border: 1px solid #0f3460;
         }
         .card h2 {
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             color: #9ca3af;
             margin-bottom: 0.5rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
         .card .value {
-            font-size: 2rem;
+            font-size: 1.75rem;
             font-weight: bold;
             color: #e94560;
         }
         .card .value.green { color: #10b981; }
         .card .value.yellow { color: #f59e0b; }
         .card .value.red { color: #ef4444; }
+        .card .value.blue { color: #3b82f6; }
         .section {
             background: #16213e;
             border-radius: 12px;
             padding: 1.5rem;
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
             border: 1px solid #0f3460;
         }
         .section h2 {
@@ -127,60 +128,144 @@
         button.secondary:hover {
             background: #16213e;
         }
+        .two-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+        @media (max-width: 900px) {
+            .two-columns {
+                grid-template-columns: 1fr;
+            }
+        }
         .nodes-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 1rem;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 0.75rem;
         }
         .node {
             background: #1a1a2e;
             border-radius: 8px;
-            padding: 1rem;
+            padding: 0.75rem;
             text-align: center;
             border: 2px solid transparent;
+            transition: all 0.3s ease;
+            position: relative;
         }
         .node.running { border-color: #10b981; }
         .node.stopped { border-color: #ef4444; }
         .node.suspended { border-color: #f59e0b; }
         .node .id {
             font-weight: bold;
-            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            margin-bottom: 0.25rem;
         }
         .node .status {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
         .node .status.running { color: #10b981; }
         .node .status.stopped { color: #ef4444; }
         .node .status.suspended { color: #f59e0b; }
+        .node .icon {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            font-size: 1.25rem;
+        }
+        /* Attack animations */
+        @keyframes attack-flash {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.8); transform: scale(1); }
+            50% { box-shadow: 0 0 20px 10px rgba(239, 68, 68, 0.4); transform: scale(1.05); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); transform: scale(1); }
+        }
+        @keyframes suspend-pulse {
+            0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.8); }
+            50% { box-shadow: 0 0 15px 8px rgba(245, 158, 11, 0.4); }
+            100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+        }
+        @keyframes delay-glow {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.8); }
+            50% { box-shadow: 0 0 15px 8px rgba(59, 130, 246, 0.4); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        @keyframes recovery-glow {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.8); }
+            50% { box-shadow: 0 0 20px 10px rgba(16, 185, 129, 0.4); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+        .node.attack-kill { animation: attack-flash 0.5s ease-out; }
+        .node.attack-suspend { animation: suspend-pulse 0.5s ease-out; }
+        .node.attack-delay { animation: delay-glow 0.5s ease-out; }
+        .node.recovery { animation: recovery-glow 0.6s ease-out; }
+        /* Timeline */
+        .timeline {
+            background: #0d1117;
+            border-radius: 8px;
+            padding: 1rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .timeline-entry {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            background: #1a1a2e;
+            font-size: 0.875rem;
+        }
+        .timeline-entry:last-child { margin-bottom: 0; }
+        .timeline-entry .icon { font-size: 1.25rem; }
+        .timeline-entry .time { color: #6b7280; font-size: 0.75rem; min-width: 70px; }
+        .timeline-entry .node-id { color: #e94560; font-weight: bold; }
+        .timeline-entry.kill { border-left: 3px solid #ef4444; }
+        .timeline-entry.suspend { border-left: 3px solid #f59e0b; }
+        .timeline-entry.delay { border-left: 3px solid #3b82f6; }
+        .timeline-entry.resume { border-left: 3px solid #10b981; }
+        .timeline-entry.recovery-start { border-left: 3px solid #8b5cf6; }
+        .timeline-entry.recovery-success { border-left: 3px solid #10b981; }
+        .timeline-entry.recovery-failed { border-left: 3px solid #ef4444; }
+        /* Attack distribution */
+        .attack-distribution {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        .attack-bar {
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-align: center;
+            flex: 1;
+        }
+        .attack-bar.kill { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        .attack-bar.suspend { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+        .attack-bar.delay { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+        /* Log */
         .log {
             background: #0d1117;
             border-radius: 8px;
             padding: 1rem;
             font-family: monospace;
-            font-size: 0.875rem;
-            max-height: 200px;
+            font-size: 0.8rem;
+            max-height: 150px;
             overflow-y: auto;
         }
         .log-entry {
-            padding: 0.25rem 0;
+            padding: 0.2rem 0;
             border-bottom: 1px solid #1a1a2e;
         }
-        .log-entry:last-child {
-            border-bottom: none;
-        }
-        .log-entry .time {
-            color: #6b7280;
-            margin-right: 0.5rem;
-        }
+        .log-entry:last-child { border-bottom: none; }
+        .log-entry .time { color: #6b7280; margin-right: 0.5rem; }
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
-        .pulse {
-            animation: pulse 2s infinite;
-        }
+        .pulse { animation: pulse 2s infinite; }
     </style>
 </head>
 <body>
@@ -190,6 +275,7 @@
     </header>
 
     <div class="container">
+        <!-- Metrics Cards -->
         <div class="grid">
             <div class="card">
                 <h2>Total Requests</h2>
@@ -207,35 +293,64 @@
                 <h2>Avg Latency</h2>
                 <div id="avgLatency" class="value">0ms</div>
             </div>
+            <div class="card">
+                <h2>Total Attacks</h2>
+                <div id="totalAttacks" class="value red">0</div>
+            </div>
+            <div class="card">
+                <h2>Recoveries</h2>
+                <div id="recoveries" class="value blue">0/0</div>
+            </div>
         </div>
 
+        <!-- Scenario Control -->
         <div class="section">
             <h2>Scenario Control</h2>
             <div class="controls">
                 <select id="presetSelect">
                     <option value="quick">Quick (5s)</option>
                     <option value="basic">Basic</option>
-                    <option value="resilience">Resilience</option>
+                    <option value="resilience" selected>Resilience</option>
                     <option value="latency">Latency</option>
                     <option value="stress">Stress</option>
                 </select>
-                <input type="text" id="duration" placeholder="Duration (e.g. 10s)" style="width: 150px;">
-                <input type="number" id="nodes" placeholder="Nodes" min="1" max="20" style="width: 100px;">
+                <input type="text" id="duration" placeholder="Duration (e.g. 30s)" style="width: 150px;">
+                <input type="number" id="nodes" placeholder="Nodes" min="1" max="20" style="width: 100px;" value="5">
                 <button id="startBtn" onclick="startScenario()">Start</button>
                 <button id="stopBtn" class="secondary" onclick="stopScenario()" disabled>Stop</button>
             </div>
         </div>
 
-        <div class="section">
-            <h2>Nodes</h2>
-            <div id="nodesGrid" class="nodes-grid">
-                <div class="node">
-                    <div class="id">-</div>
-                    <div class="status">No nodes</div>
+        <div class="two-columns">
+            <!-- Nodes -->
+            <div class="section">
+                <h2>Nodes</h2>
+                <div id="nodesGrid" class="nodes-grid">
+                    <div class="node">
+                        <div class="id">-</div>
+                        <div class="status">No nodes</div>
+                    </div>
+                </div>
+                <div id="attackDistribution" class="attack-distribution" style="display: none;">
+                    <div class="attack-bar kill" id="killBar">Kill: 0</div>
+                    <div class="attack-bar suspend" id="suspendBar">Suspend: 0</div>
+                    <div class="attack-bar delay" id="delayBar">Delay: 0</div>
+                </div>
+            </div>
+
+            <!-- Chaos Timeline -->
+            <div class="section">
+                <h2>Chaos Timeline</h2>
+                <div id="chaosTimeline" class="timeline">
+                    <div class="timeline-entry" style="opacity: 0.5;">
+                        <span class="icon">...</span>
+                        <span>Waiting for chaos events...</span>
+                    </div>
                 </div>
             </div>
         </div>
 
+        <!-- Activity Log -->
         <div class="section">
             <h2>Activity Log</h2>
             <div id="log" class="log">
@@ -250,6 +365,8 @@
     <script>
         let ws = null;
         let isRunning = false;
+        let timelineEvents = [];
+        const MAX_TIMELINE_EVENTS = 50;
 
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -277,13 +394,157 @@
         function handleMessage(data) {
             if (data.type === 'status') {
                 updateStatus(data.status);
+                if (data.chaos_stats) updateChaosStats(data.chaos_stats);
+                if (data.recovery_stats) updateRecoveryStats(data.recovery_stats);
+                if (data.metrics) updateMetrics(data.metrics);
+            } else if (data.type === 'event') {
+                handleChaosEvent(data.event);
             } else if (data.type === 'scenario_complete') {
                 isRunning = false;
                 updateUI();
                 if (data.result) {
-                    addLog(`Scenario completed: ${data.result.TotalRequests} requests`);
+                    addLog(`Scenario completed: ${data.result.TotalRequests} requests, ${data.result.TotalAttacks} attacks`);
                 }
             }
+        }
+
+        function handleChaosEvent(event) {
+            addTimelineEntry(event);
+            animateNode(event.node_id, event.type, event.data);
+        }
+
+        function addTimelineEntry(event) {
+            const timeline = document.getElementById('chaosTimeline');
+            const time = new Date(event.timestamp).toLocaleTimeString();
+
+            let icon, message, cssClass;
+
+            switch(event.type) {
+                case 'chaos_attack':
+                    const attackType = event.data?.attack_type || 'unknown';
+                    if (attackType === 'kill') {
+                        icon = '💀'; message = 'killed'; cssClass = 'kill';
+                    } else if (attackType === 'suspend') {
+                        icon = '⏸️'; message = 'suspended'; cssClass = 'suspend';
+                    } else if (attackType === 'delay') {
+                        const delay = event.data?.delay_duration || '';
+                        icon = '🕐'; message = `delay +${delay}`; cssClass = 'delay';
+                    }
+                    break;
+                case 'chaos_resume':
+                    icon = '▶️'; message = 'auto-resumed'; cssClass = 'resume';
+                    break;
+                case 'recovery_start':
+                    icon = '🔧'; message = `recovery attempt #${event.data?.attempt || 1}`; cssClass = 'recovery-start';
+                    break;
+                case 'recovery_success':
+                    icon = '✅'; message = 'recovered'; cssClass = 'recovery-success';
+                    break;
+                case 'recovery_failed':
+                    icon = '❌'; message = 'recovery failed'; cssClass = 'recovery-failed';
+                    break;
+                default:
+                    icon = '📝'; message = event.type; cssClass = '';
+            }
+
+            const entry = document.createElement('div');
+            entry.className = `timeline-entry ${cssClass}`;
+            entry.innerHTML = `
+                <span class="icon">${icon}</span>
+                <span class="time">${time}</span>
+                <span class="node-id">${event.node_id}</span>
+                <span>${message}</span>
+            `;
+
+            // Remove placeholder if exists
+            const placeholder = timeline.querySelector('.timeline-entry[style*="opacity"]');
+            if (placeholder) placeholder.remove();
+
+            timeline.insertBefore(entry, timeline.firstChild);
+
+            // Keep only last N entries
+            while (timeline.children.length > MAX_TIMELINE_EVENTS) {
+                timeline.removeChild(timeline.lastChild);
+            }
+        }
+
+        function animateNode(nodeId, eventType, data) {
+            const nodes = document.querySelectorAll('.node');
+            nodes.forEach(node => {
+                if (node.querySelector('.id')?.textContent === nodeId) {
+                    // Remove existing animation classes
+                    node.classList.remove('attack-kill', 'attack-suspend', 'attack-delay', 'recovery');
+
+                    // Add appropriate animation
+                    if (eventType === 'chaos_attack') {
+                        const attackType = data?.attack_type || 'kill';
+                        node.classList.add(`attack-${attackType}`);
+
+                        // Show icon temporarily
+                        let icon;
+                        if (attackType === 'kill') icon = '💀';
+                        else if (attackType === 'suspend') icon = '⏸️';
+                        else if (attackType === 'delay') icon = '🕐';
+
+                        if (icon) {
+                            const iconEl = document.createElement('span');
+                            iconEl.className = 'icon';
+                            iconEl.textContent = icon;
+                            node.appendChild(iconEl);
+                            setTimeout(() => iconEl.remove(), 2000);
+                        }
+                    } else if (eventType === 'recovery_success' || eventType === 'chaos_resume') {
+                        node.classList.add('recovery');
+                        const iconEl = document.createElement('span');
+                        iconEl.className = 'icon';
+                        iconEl.textContent = '✅';
+                        node.appendChild(iconEl);
+                        setTimeout(() => iconEl.remove(), 2000);
+                    }
+
+                    // Remove animation class after animation completes
+                    setTimeout(() => {
+                        node.classList.remove('attack-kill', 'attack-suspend', 'attack-delay', 'recovery');
+                    }, 600);
+                }
+            });
+        }
+
+        function updateMetrics(metrics) {
+            document.getElementById('totalRequests').textContent = formatNumber(metrics.total_requests);
+            document.getElementById('rps').textContent = metrics.rps.toFixed(1);
+
+            const errorRate = (metrics.error_rate * 100).toFixed(2);
+            const errorRateEl = document.getElementById('errorRate');
+            errorRateEl.textContent = `${errorRate}%`;
+            errorRateEl.className = `value ${errorRate > 5 ? 'red' : errorRate > 1 ? 'yellow' : 'green'}`;
+
+            document.getElementById('avgLatency').textContent = `${metrics.avg_latency_ms.toFixed(2)}ms`;
+        }
+
+        function updateChaosStats(stats) {
+            document.getElementById('totalAttacks').textContent = stats.total_attacks || 0;
+
+            const byType = stats.attacks_by_type || {};
+            document.getElementById('killBar').textContent = `Kill: ${byType.kill || 0}`;
+            document.getElementById('suspendBar').textContent = `Suspend: ${byType.suspend || 0}`;
+            document.getElementById('delayBar').textContent = `Delay: ${byType.delay || 0}`;
+
+            if (stats.total_attacks > 0) {
+                document.getElementById('attackDistribution').style.display = 'flex';
+            }
+        }
+
+        function updateRecoveryStats(stats) {
+            const success = stats.SuccessRecoveries || 0;
+            const total = stats.TotalRecoveries || 0;
+            document.getElementById('recoveries').textContent = `${success}/${total}`;
+        }
+
+        function formatNumber(n) {
+            if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+            if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+            return n.toString();
         }
 
         function updateStatus(status) {
@@ -321,6 +582,10 @@
             const body = { preset };
             if (duration) body.duration = duration;
             if (nodes) body.nodes = parseInt(nodes);
+
+            // Clear timeline
+            document.getElementById('chaosTimeline').innerHTML = '';
+            document.getElementById('attackDistribution').style.display = 'none';
 
             try {
                 const resp = await fetch('/api/scenario/start', {
@@ -384,10 +649,10 @@
             }
 
             grid.innerHTML = nodes.map(n => `
-                <div class="node ${n.status.toLowerCase()}">
+                <div class="node ${n.status.toLowerCase()}" data-node-id="${n.id}">
                     <div class="id">${n.id}</div>
                     <div class="status ${n.status.toLowerCase()}">${n.status}</div>
-                    ${n.delay ? `<div style="font-size: 0.75rem; color: #f59e0b;">+${n.delay}</div>` : ''}
+                    ${n.delay ? `<div style="font-size: 0.7rem; color: #3b82f6;">+${n.delay}</div>` : ''}
                 </div>
             `).join('');
         }
@@ -400,13 +665,11 @@
             entry.innerHTML = `<span class="time">${time}</span><span>${message}</span>`;
             log.insertBefore(entry, log.firstChild);
 
-            // Keep only last 50 entries
-            while (log.children.length > 50) {
+            while (log.children.length > 30) {
                 log.removeChild(log.lastChild);
             }
         }
 
-        // Initial load
         async function init() {
             try {
                 const resp = await fetch('/api/status');

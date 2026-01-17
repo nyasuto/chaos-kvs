@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"chaos-kvs/internal/cluster"
+	"chaos-kvs/internal/events"
 	"chaos-kvs/internal/logger"
 	"chaos-kvs/internal/scenario"
 
@@ -22,10 +23,11 @@ var staticFiles embed.FS
 
 // Server はAPIサーバー
 type Server struct {
-	addr    string
-	cluster *cluster.Cluster
-	engine  *scenario.Engine
-	config  scenario.Config
+	addr     string
+	cluster  *cluster.Cluster
+	engine   *scenario.Engine
+	config   scenario.Config
+	eventBus *events.Bus
 
 	mu        sync.RWMutex
 	running   bool
@@ -39,6 +41,7 @@ func NewServer(addr string) *Server {
 	return &Server{
 		addr:      addr,
 		wsClients: make(map[*websocket.Conn]bool),
+		eventBus:  events.NewBus(),
 	}
 }
 
@@ -188,9 +191,17 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 
 	resp := MetricsResponse{}
 
-	// Note: Engine doesn't expose metrics directly yet
-	// This would need to be enhanced in the scenario package
-	_ = engine // suppress unused variable warning
+	if engine != nil {
+		if m := engine.Metrics(); m != nil {
+			resp.TotalRequests = m.TotalRequests
+			resp.SuccessRequests = m.SuccessRequests
+			resp.FailedRequests = m.FailedRequests
+			resp.RPS = m.RPS
+			resp.AvgLatencyMs = float64(m.AverageLatency.Microseconds()) / 1000.0
+			resp.P99LatencyMs = float64(m.P99Latency.Microseconds()) / 1000.0
+			resp.ErrorRate = m.ErrorRate
+		}
+	}
 
 	s.writeJSON(w, resp)
 }
@@ -240,6 +251,7 @@ func (s *Server) handleScenarioStart(w http.ResponseWriter, r *http.Request) {
 	s.config = config
 	s.cluster = cluster.New()
 	s.engine = scenario.New(config)
+	s.engine.SetEventBus(s.eventBus)
 	s.running = true
 	s.mu.Unlock()
 
@@ -314,11 +326,28 @@ func (s *Server) handleWebSocket(ws *websocket.Conn) {
 	s.wsClients[ws] = true
 	s.mu.Unlock()
 
+	// Subscribe to events
+	eventCh := s.eventBus.Subscribe()
+
 	defer func() {
+		s.eventBus.Unsubscribe(eventCh)
 		s.mu.Lock()
 		delete(s.wsClients, ws)
 		s.mu.Unlock()
 		_ = ws.Close()
+	}()
+
+	// Forward events to this client
+	go func() {
+		for event := range eventCh {
+			msg := map[string]interface{}{
+				"type":  "event",
+				"event": event,
+			}
+			if err := websocket.JSON.Send(ws, msg); err != nil {
+				return
+			}
+		}
 	}()
 
 	// Keep connection alive
@@ -369,16 +398,54 @@ func (s *Server) broadcastLoop(ctx context.Context) {
 			if s.config.Name != "" {
 				status.ScenarioName = s.config.Name
 			}
-			if s.cluster != nil {
-				status.NodeCount = s.cluster.Size()
-				status.RunningNodes = s.cluster.RunningCount()
-			}
+
+			engine := s.engine
 			s.mu.RUnlock()
 
-			s.broadcast(map[string]interface{}{
+			// Get cluster info from engine
+			if engine != nil {
+				if c := engine.Cluster(); c != nil {
+					status.NodeCount = c.Size()
+					status.RunningNodes = c.RunningCount()
+					for _, n := range c.Nodes() {
+						switch n.Status().String() {
+						case "Stopped":
+							status.StoppedNodes++
+						case "Suspended":
+							status.SuspendedNodes++
+						}
+					}
+				}
+			}
+
+			// Build the full status update
+			msg := map[string]interface{}{
 				"type":   "status",
 				"status": status,
-			})
+			}
+
+			// Add chaos stats
+			if engine != nil {
+				if cs := engine.ChaosStats(); cs != nil {
+					msg["chaos_stats"] = cs
+				}
+				if rs := engine.RecoveryStats(); rs != nil {
+					msg["recovery_stats"] = rs
+				}
+				if m := engine.Metrics(); m != nil {
+					msg["metrics"] = MetricsResponse{
+						TotalRequests:   m.TotalRequests,
+						SuccessRequests: m.SuccessRequests,
+						FailedRequests:  m.FailedRequests,
+						RPS:             m.RPS,
+						AvgLatencyMs:    float64(m.AverageLatency.Microseconds()) / 1000.0,
+						P99LatencyMs:    float64(m.P99Latency.Microseconds()) / 1000.0,
+						ErrorRate:       m.ErrorRate,
+					}
+				}
+			}
+
+			s.broadcast(msg)
 		}
 	}
 }

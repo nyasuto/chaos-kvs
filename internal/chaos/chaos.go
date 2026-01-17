@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"chaos-kvs/internal/cluster"
+	"chaos-kvs/internal/events"
 	"chaos-kvs/internal/logger"
 	"chaos-kvs/internal/node"
 )
@@ -54,10 +55,17 @@ func DefaultConfig() Config {
 	}
 }
 
+// Stats はカオス攻撃の統計情報
+type Stats struct {
+	TotalAttacks uint64            `json:"total_attacks"`
+	ByType       map[string]uint64 `json:"attacks_by_type"`
+}
+
 // Monkey はカオスエンジニアリングを実行する
 type Monkey struct {
-	config  Config
-	cluster *cluster.Cluster
+	config   Config
+	cluster  *cluster.Cluster
+	eventBus *events.Bus
 
 	running atomic.Bool
 	ctx     context.Context
@@ -66,6 +74,7 @@ type Monkey struct {
 
 	mu           sync.RWMutex
 	attackCount  uint64
+	attackByType map[AttackType]uint64
 	lastAttack   time.Time
 	suspendedIDs map[string]time.Time
 }
@@ -76,6 +85,19 @@ func New(c *cluster.Cluster, config Config) *Monkey {
 		config:       config,
 		cluster:      c,
 		suspendedIDs: make(map[string]time.Time),
+		attackByType: make(map[AttackType]uint64),
+	}
+}
+
+// SetEventBus はイベントバスを設定する
+func (m *Monkey) SetEventBus(bus *events.Bus) {
+	m.eventBus = bus
+}
+
+// publishEvent はイベントを発行する
+func (m *Monkey) publishEvent(event events.Event) {
+	if m.eventBus != nil {
+		m.eventBus.Publish(event)
 	}
 }
 
@@ -227,6 +249,11 @@ func (m *Monkey) attackKill(n *node.Node) {
 		return
 	}
 	logger.Warn("", "ChaosMonkey: killed node %s", n.ID())
+	m.publishEvent(events.NewChaosAttackEvent(n.ID(), events.AttackTypeKill))
+
+	m.mu.Lock()
+	m.attackByType[AttackKill]++
+	m.mu.Unlock()
 }
 
 // attackSuspend はノードを一時停止する
@@ -238,15 +265,22 @@ func (m *Monkey) attackSuspend(n *node.Node) {
 
 	m.mu.Lock()
 	m.suspendedIDs[n.ID()] = time.Now()
+	m.attackByType[AttackSuspend]++
 	m.mu.Unlock()
 
 	logger.Warn("", "ChaosMonkey: suspended node %s", n.ID())
+	m.publishEvent(events.NewChaosAttackEvent(n.ID(), events.AttackTypeSuspend))
 }
 
 // attackDelay はノードに遅延を注入する
 func (m *Monkey) attackDelay(n *node.Node) {
 	n.SetDelay(m.config.DelayDuration)
 	logger.Warn("", "ChaosMonkey: injected %v delay to node %s", m.config.DelayDuration, n.ID())
+	m.publishEvent(events.NewChaosAttackEventWithDelay(n.ID(), m.config.DelayDuration))
+
+	m.mu.Lock()
+	m.attackByType[AttackDelay]++
+	m.mu.Unlock()
 }
 
 // checkAndResume はsuspend時間が経過したノードをresumeする
@@ -260,6 +294,7 @@ func (m *Monkey) checkAndResume() {
 			if n, exists := m.cluster.GetNode(nodeID); exists {
 				if err := n.Resume(); err == nil {
 					logger.Info("", "ChaosMonkey: auto-resumed node %s", nodeID)
+					m.publishEvent(events.NewChaosResumeEvent(nodeID))
 				}
 			}
 			delete(m.suspendedIDs, nodeID)
@@ -299,4 +334,20 @@ func (m *Monkey) SetConfig(config Config) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.config = config
+}
+
+// Stats は攻撃統計を返す
+func (m *Monkey) Stats() Stats {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	byType := make(map[string]uint64)
+	for t, count := range m.attackByType {
+		byType[t.String()] = count
+	}
+
+	return Stats{
+		TotalAttacks: m.attackCount,
+		ByType:       byType,
+	}
 }

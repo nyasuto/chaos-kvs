@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"chaos-kvs/internal/cluster"
+	"chaos-kvs/internal/events"
 	"chaos-kvs/internal/logger"
 	"chaos-kvs/internal/node"
 )
@@ -51,8 +52,9 @@ type Stats struct {
 
 // Manager は障害からの復旧を管理する
 type Manager struct {
-	config  Config
-	cluster *cluster.Cluster
+	config   Config
+	cluster  *cluster.Cluster
+	eventBus *events.Bus
 
 	running atomic.Bool
 	ctx     context.Context
@@ -70,6 +72,18 @@ func New(c *cluster.Cluster, config Config) *Manager {
 		config:     config,
 		cluster:    c,
 		nodeStates: make(map[string]*NodeState),
+	}
+}
+
+// SetEventBus はイベントバスを設定する
+func (m *Manager) SetEventBus(bus *events.Bus) {
+	m.eventBus = bus
+}
+
+// publishEvent はイベントを発行する
+func (m *Manager) publishEvent(event events.Event) {
+	if m.eventBus != nil {
+		m.eventBus.Publish(event)
 	}
 }
 
@@ -158,7 +172,6 @@ func (m *Manager) checkNode(n *node.Node, now time.Time) {
 // handleRunningNode は稼働中のノードを処理する
 func (m *Manager) handleRunningNode(n *node.Node, state *NodeState, now time.Time) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 
 	// 遅延クリア
 	if m.config.ClearDelay && n.Delay() > 0 {
@@ -167,15 +180,22 @@ func (m *Manager) handleRunningNode(n *node.Node, state *NodeState, now time.Tim
 	}
 
 	// 復旧完了を記録
+	shouldPublish := false
 	if !state.IsRecovered && state.RetryCount > 0 {
 		state.IsRecovered = true
 		m.stats.SuccessRecoveries++
+		shouldPublish = true
 		logger.Info("", "RecoveryManager: node %s recovered successfully", n.ID())
 	}
 
 	state.LastSeen = now
 	state.RetryCount = 0
 	state.IsRecovered = false
+	m.mu.Unlock()
+
+	if shouldPublish {
+		m.publishEvent(events.NewRecoverySuccessEvent(n.ID()))
+	}
 }
 
 // handleStoppedNode は停止したノードを処理する
@@ -210,7 +230,10 @@ func (m *Manager) handleStoppedNode(n *node.Node, state *NodeState, now time.Tim
 	state.RetryCount++
 	state.FailedAt = now
 	m.stats.TotalRecoveries++
+	retryCount := state.RetryCount
 	m.mu.Unlock()
+
+	m.publishEvent(events.NewRecoveryStartEvent(n.ID(), retryCount))
 
 	// 再起動を試みる
 	if err := n.Start(m.ctx); err != nil {
@@ -218,6 +241,7 @@ func (m *Manager) handleStoppedNode(n *node.Node, state *NodeState, now time.Tim
 		m.stats.FailedRecoveries++
 		m.mu.Unlock()
 		logger.Error("", "RecoveryManager: failed to restart node %s: %v", n.ID(), err)
+		m.publishEvent(events.NewRecoveryFailedEvent(n.ID(), err))
 		return
 	}
 
@@ -226,7 +250,7 @@ func (m *Manager) handleStoppedNode(n *node.Node, state *NodeState, now time.Tim
 	state.FailedAt = time.Time{}
 	m.mu.Unlock()
 
-	logger.Info("", "RecoveryManager: restarted node %s (attempt %d)", n.ID(), state.RetryCount)
+	logger.Info("", "RecoveryManager: restarted node %s (attempt %d)", n.ID(), retryCount)
 }
 
 // handleSuspendedNode は一時停止中のノードを処理する
@@ -254,7 +278,10 @@ func (m *Manager) handleSuspendedNode(n *node.Node, state *NodeState, now time.T
 	state.RetryCount++
 	state.FailedAt = time.Time{}
 	m.stats.TotalRecoveries++
+	retryCount := state.RetryCount
 	m.mu.Unlock()
+
+	m.publishEvent(events.NewRecoveryStartEvent(n.ID(), retryCount))
 
 	// 再開を試みる
 	if err := n.Resume(); err != nil {
@@ -262,6 +289,7 @@ func (m *Manager) handleSuspendedNode(n *node.Node, state *NodeState, now time.T
 		m.stats.FailedRecoveries++
 		m.mu.Unlock()
 		logger.Error("", "RecoveryManager: failed to resume node %s: %v", n.ID(), err)
+		m.publishEvent(events.NewRecoveryFailedEvent(n.ID(), err))
 		return
 	}
 
@@ -270,6 +298,7 @@ func (m *Manager) handleSuspendedNode(n *node.Node, state *NodeState, now time.T
 	m.mu.Unlock()
 
 	logger.Info("", "RecoveryManager: resumed node %s", n.ID())
+	m.publishEvent(events.NewRecoverySuccessEvent(n.ID()))
 }
 
 // IsRunning は実行中かどうかを返す
