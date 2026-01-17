@@ -12,6 +12,20 @@ import (
 // Job はワーカーが実行するジョブを表す
 type Job func()
 
+// PoolConfig はワーカープールの設定
+type PoolConfig struct {
+	NumWorkers  int // ワーカー数（0でCPU数）
+	QueueFactor int // キューサイズ = NumWorkers * QueueFactor
+}
+
+// DefaultPoolConfig はデフォルト設定を返す
+func DefaultPoolConfig() PoolConfig {
+	return PoolConfig{
+		NumWorkers:  0,   // CPU数
+		QueueFactor: 100, // デフォルト倍率
+	}
+}
+
 // Pool はゴルーチンのプールを管理する
 type Pool struct {
 	numWorkers int
@@ -27,12 +41,24 @@ type Pool struct {
 // NewPool は新しいワーカープールを作成する
 // numWorkers が 0 の場合は CPU 数を使用
 func NewPool(numWorkers int) *Pool {
+	config := DefaultPoolConfig()
+	config.NumWorkers = numWorkers
+	return NewPoolWithConfig(config)
+}
+
+// NewPoolWithConfig は設定を指定してワーカープールを作成する
+func NewPoolWithConfig(config PoolConfig) *Pool {
+	numWorkers := config.NumWorkers
 	if numWorkers <= 0 {
 		numWorkers = runtime.NumCPU()
 	}
+	queueFactor := config.QueueFactor
+	if queueFactor <= 0 {
+		queueFactor = 100
+	}
 	return &Pool{
 		numWorkers: numWorkers,
-		jobs:       make(chan Job, numWorkers*100),
+		jobs:       make(chan Job, numWorkers*queueFactor),
 	}
 }
 
