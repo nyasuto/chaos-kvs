@@ -1,5 +1,5 @@
 # Binaries
-chaos-kvs
+/chaos-kvs
 *.exe
 *.exe~
 *.dll

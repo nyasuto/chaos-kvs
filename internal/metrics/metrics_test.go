@@ -1,4 +1,4 @@
-package main
+package metrics
 
 import (
 	"sync"
@@ -7,7 +7,7 @@ import (
 )
 
 func TestNewMetrics(t *testing.T) {
-	m := NewMetrics()
+	m := New()
 
 	if m.TotalRequests() != 0 {
 		t.Errorf("expected 0 total requests, got %d", m.TotalRequests())
@@ -18,7 +18,7 @@ func TestNewMetrics(t *testing.T) {
 }
 
 func TestMetricsRecordSuccess(t *testing.T) {
-	m := NewMetrics()
+	m := New()
 
 	m.RecordSuccess(10 * time.Millisecond)
 	m.RecordSuccess(20 * time.Millisecond)
@@ -36,7 +36,7 @@ func TestMetricsRecordSuccess(t *testing.T) {
 }
 
 func TestMetricsRecordFailure(t *testing.T) {
-	m := NewMetrics()
+	m := New()
 
 	m.RecordFailure(10 * time.Millisecond)
 	m.RecordSuccess(20 * time.Millisecond)
@@ -50,7 +50,7 @@ func TestMetricsRecordFailure(t *testing.T) {
 }
 
 func TestMetricsAverageLatency(t *testing.T) {
-	m := NewMetrics()
+	m := New()
 
 	m.RecordSuccess(10 * time.Millisecond)
 	m.RecordSuccess(20 * time.Millisecond)
@@ -65,7 +65,7 @@ func TestMetricsAverageLatency(t *testing.T) {
 }
 
 func TestMetricsErrorRate(t *testing.T) {
-	m := NewMetrics()
+	m := New()
 
 	m.RecordSuccess(10 * time.Millisecond)
 	m.RecordFailure(10 * time.Millisecond)
@@ -77,7 +77,7 @@ func TestMetricsErrorRate(t *testing.T) {
 }
 
 func TestMetricsP99Latency(t *testing.T) {
-	m := NewMetrics()
+	m := New()
 
 	for i := 1; i <= 100; i++ {
 		m.RecordSuccess(time.Duration(i) * time.Millisecond)
@@ -91,7 +91,7 @@ func TestMetricsP99Latency(t *testing.T) {
 }
 
 func TestMetricsReset(t *testing.T) {
-	m := NewMetrics()
+	m := New()
 
 	m.RecordSuccess(10 * time.Millisecond)
 	m.RecordSuccess(20 * time.Millisecond)
@@ -110,7 +110,7 @@ func TestMetricsReset(t *testing.T) {
 }
 
 func TestMetricsConcurrent(t *testing.T) {
-	m := NewMetrics()
+	m := New()
 	var wg sync.WaitGroup
 
 	for range 100 {
@@ -131,7 +131,7 @@ func TestMetricsConcurrent(t *testing.T) {
 }
 
 func TestMetricsSnapshot(t *testing.T) {
-	m := NewMetrics()
+	m := New()
 
 	m.RecordSuccess(10 * time.Millisecond)
 	m.RecordFailure(20 * time.Millisecond)

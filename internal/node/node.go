@@ -1,27 +1,30 @@
-package main
+// Package node provides an in-memory key-value store node implementation.
+package node
 
 import (
 	"context"
 	"fmt"
 	"sync"
+
+	"chaos-kvs/internal/logger"
 )
 
-// NodeStatus はノードの状態を表す
-type NodeStatus int
+// Status はノードの状態を表す
+type Status int
 
 const (
-	NodeStatusStopped NodeStatus = iota
-	NodeStatusRunning
-	NodeStatusSuspended
+	StatusStopped Status = iota
+	StatusRunning
+	StatusSuspended
 )
 
-func (s NodeStatus) String() string {
+func (s Status) String() string {
 	switch s {
-	case NodeStatusStopped:
+	case StatusStopped:
 		return "stopped"
-	case NodeStatusRunning:
+	case StatusRunning:
 		return "running"
-	case NodeStatusSuspended:
+	case StatusSuspended:
 		return "suspended"
 	default:
 		return "unknown"
@@ -30,8 +33,8 @@ func (s NodeStatus) String() string {
 
 // Node はインメモリKVSの単一ノードを表す
 type Node struct {
-	ID     string
-	status NodeStatus
+	id     string
+	status Status
 
 	mu   sync.RWMutex
 	data map[string][]byte
@@ -40,13 +43,18 @@ type Node struct {
 	cancel context.CancelFunc
 }
 
-// NewNode は新しいノードを作成する
-func NewNode(id string) *Node {
+// New は新しいノードを作成する
+func New(id string) *Node {
 	return &Node{
-		ID:     id,
-		status: NodeStatusStopped,
+		id:     id,
+		status: StatusStopped,
 		data:   make(map[string][]byte),
 	}
+}
+
+// ID はノードIDを返す
+func (n *Node) ID() string {
+	return n.id
 }
 
 // Start はノードを起動する
@@ -54,14 +62,14 @@ func (n *Node) Start(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	if n.status == NodeStatusRunning {
-		return fmt.Errorf("node %s is already running", n.ID)
+	if n.status == StatusRunning {
+		return fmt.Errorf("node %s is already running", n.id)
 	}
 
 	n.ctx, n.cancel = context.WithCancel(ctx)
-	n.status = NodeStatusRunning
+	n.status = StatusRunning
 
-	LogInfo(n.ID, "Node started")
+	logger.Info(n.id, "Node started")
 	return nil
 }
 
@@ -70,21 +78,21 @@ func (n *Node) Stop() error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	if n.status == NodeStatusStopped {
-		return fmt.Errorf("node %s is already stopped", n.ID)
+	if n.status == StatusStopped {
+		return fmt.Errorf("node %s is already stopped", n.id)
 	}
 
 	if n.cancel != nil {
 		n.cancel()
 	}
-	n.status = NodeStatusStopped
+	n.status = StatusStopped
 
-	LogInfo(n.ID, "Node stopped")
+	logger.Info(n.id, "Node stopped")
 	return nil
 }
 
 // Status はノードの現在のステータスを返す
-func (n *Node) Status() NodeStatus {
+func (n *Node) Status() Status {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.status
@@ -95,7 +103,7 @@ func (n *Node) Get(key string) ([]byte, bool) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
-	if n.status != NodeStatusRunning {
+	if n.status != StatusRunning {
 		return nil, false
 	}
 
@@ -108,8 +116,8 @@ func (n *Node) Set(key string, value []byte) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	if n.status != NodeStatusRunning {
-		return fmt.Errorf("node %s is not running", n.ID)
+	if n.status != StatusRunning {
+		return fmt.Errorf("node %s is not running", n.id)
 	}
 
 	n.data[key] = value
@@ -121,8 +129,8 @@ func (n *Node) Delete(key string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	if n.status != NodeStatusRunning {
-		return fmt.Errorf("node %s is not running", n.ID)
+	if n.status != StatusRunning {
+		return fmt.Errorf("node %s is not running", n.id)
 	}
 
 	delete(n.data, key)

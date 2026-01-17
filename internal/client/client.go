@@ -1,4 +1,5 @@
-package main
+// Package client provides a load generator for stress testing the cluster.
+package client
 
 import (
 	"context"
@@ -8,10 +9,16 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"chaos-kvs/internal/cluster"
+	"chaos-kvs/internal/logger"
+	"chaos-kvs/internal/metrics"
+	"chaos-kvs/internal/node"
+	"chaos-kvs/internal/worker"
 )
 
-// ClientConfig はClientの設定
-type ClientConfig struct {
+// Config はClientの設定
+type Config struct {
 	NumWorkers    int     // ワーカー数（0でCPU数）
 	WriteRatio    float64 // Write比率（0.0〜1.0）
 	KeyRange      int     // キーの範囲（0〜KeyRange-1）
@@ -19,9 +26,9 @@ type ClientConfig struct {
 	RequestsLimit uint64  // リクエスト上限（0で無制限）
 }
 
-// DefaultClientConfig はデフォルト設定を返す
-func DefaultClientConfig() ClientConfig {
-	return ClientConfig{
+// DefaultConfig はデフォルト設定を返す
+func DefaultConfig() Config {
+	return Config{
 		NumWorkers:    0,   // CPU数
 		WriteRatio:    0.5, // 50% Write
 		KeyRange:      10000,
@@ -32,10 +39,10 @@ func DefaultClientConfig() ClientConfig {
 
 // Client は負荷生成器
 type Client struct {
-	config  ClientConfig
-	cluster *Cluster
-	pool    *WorkerPool
-	metrics *Metrics
+	config  Config
+	cluster *cluster.Cluster
+	pool    *worker.Pool
+	metrics *metrics.Metrics
 
 	running atomic.Bool
 	ctx     context.Context
@@ -43,13 +50,13 @@ type Client struct {
 	wg      sync.WaitGroup
 }
 
-// NewClient は新しいClientを作成する
-func NewClient(cluster *Cluster, config ClientConfig) *Client {
+// New は新しいClientを作成する
+func New(c *cluster.Cluster, config Config) *Client {
 	return &Client{
 		config:  config,
-		cluster: cluster,
-		pool:    NewWorkerPool(config.NumWorkers),
-		metrics: NewMetrics(),
+		cluster: c,
+		pool:    worker.NewPool(config.NumWorkers),
+		metrics: metrics.New(),
 	}
 }
 
@@ -62,7 +69,7 @@ func (c *Client) Start(ctx context.Context) {
 	c.ctx, c.cancel = context.WithCancel(ctx)
 	c.pool.Start(c.ctx)
 
-	LogInfo("", "Client started (workers: %d, write_ratio: %.1f%%)",
+	logger.Info("", "Client started (workers: %d, write_ratio: %.1f%%)",
 		c.pool.NumWorkers(), c.config.WriteRatio*100)
 
 	// リクエスト生成ループ
@@ -76,7 +83,7 @@ func (c *Client) generateRequests() {
 
 	nodes := c.cluster.Nodes()
 	if len(nodes) == 0 {
-		LogError("", "No nodes available in cluster")
+		logger.Error("", "No nodes available in cluster")
 		return
 	}
 
@@ -93,11 +100,11 @@ func (c *Client) generateRequests() {
 		}
 
 		// ジョブを生成
-		node := nodes[rand.Intn(len(nodes))]
+		n := nodes[rand.Intn(len(nodes))]
 		key := fmt.Sprintf("key-%d", rand.Intn(c.config.KeyRange))
 		isWrite := rand.Float64() < c.config.WriteRatio
 
-		job := c.createJob(node, key, isWrite)
+		job := c.createJob(n, key, isWrite)
 		if !c.pool.Submit(job) {
 			return
 		}
@@ -105,7 +112,7 @@ func (c *Client) generateRequests() {
 }
 
 // createJob はリクエストジョブを作成する
-func (c *Client) createJob(node *Node, key string, isWrite bool) Job {
+func (c *Client) createJob(n *node.Node, key string, isWrite bool) worker.Job {
 	return func() {
 		start := time.Now()
 		var err error
@@ -113,9 +120,9 @@ func (c *Client) createJob(node *Node, key string, isWrite bool) Job {
 		if isWrite {
 			value := make([]byte, c.config.ValueSize)
 			_, _ = cryptorand.Read(value)
-			err = node.Set(key, value)
+			err = n.Set(key, value)
 		} else {
-			_, _ = node.Get(key)
+			_, _ = n.Get(key)
 		}
 
 		latency := time.Since(start)
@@ -137,11 +144,11 @@ func (c *Client) Stop() {
 	c.pool.Stop()
 	c.wg.Wait()
 
-	LogInfo("", "Client stopped")
+	logger.Info("", "Client stopped")
 }
 
 // Metrics はメトリクスを返す
-func (c *Client) Metrics() *Metrics {
+func (c *Client) Metrics() *metrics.Metrics {
 	return c.metrics
 }
 
@@ -151,7 +158,7 @@ func (c *Client) IsRunning() bool {
 }
 
 // RunFor は指定時間だけ負荷生成を実行する
-func (c *Client) RunFor(ctx context.Context, duration time.Duration) *MetricsSnapshot {
+func (c *Client) RunFor(ctx context.Context, duration time.Duration) *metrics.Snapshot {
 	c.Start(ctx)
 
 	select {
@@ -166,7 +173,7 @@ func (c *Client) RunFor(ctx context.Context, duration time.Duration) *MetricsSna
 }
 
 // RunRequests は指定数のリクエストを実行する
-func (c *Client) RunRequests(ctx context.Context, count uint64) *MetricsSnapshot {
+func (c *Client) RunRequests(ctx context.Context, count uint64) *metrics.Snapshot {
 	c.config.RequestsLimit = count
 	c.Start(ctx)
 	c.wg.Wait()

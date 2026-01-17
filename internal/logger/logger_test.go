@@ -1,4 +1,4 @@
-package main
+package logger
 
 import (
 	"bytes"
@@ -8,31 +8,31 @@ import (
 
 func TestLogLevel(t *testing.T) {
 	tests := []struct {
-		level    LogLevel
+		level    Level
 		expected string
 	}{
-		{LogLevelDebug, "DEBUG"},
-		{LogLevelInfo, "INFO"},
-		{LogLevelWarn, "WARN"},
-		{LogLevelError, "ERROR"},
-		{LogLevel(99), "UNKNOWN"},
+		{LevelDebug, "DEBUG"},
+		{LevelInfo, "INFO"},
+		{LevelWarn, "WARN"},
+		{LevelError, "ERROR"},
+		{Level(99), "UNKNOWN"},
 	}
 
 	for _, tt := range tests {
 		if got := tt.level.String(); got != tt.expected {
-			t.Errorf("LogLevel(%d).String() = %s, want %s", tt.level, got, tt.expected)
+			t.Errorf("Level(%d).String() = %s, want %s", tt.level, got, tt.expected)
 		}
 	}
 }
 
 func TestLoggerOutput(t *testing.T) {
 	buf := &bytes.Buffer{}
-	logger := NewLogger(buf, LogLevelDebug)
+	l := New(buf, LevelDebug)
 
-	logger.Debug("node-1", "debug message")
-	logger.Info("node-1", "info message")
-	logger.Warn("node-1", "warn message")
-	logger.Error("node-1", "error message")
+	l.Debug("node-1", "debug message")
+	l.Info("node-1", "info message")
+	l.Warn("node-1", "warn message")
+	l.Error("node-1", "error message")
 
 	output := buf.String()
 
@@ -55,12 +55,12 @@ func TestLoggerOutput(t *testing.T) {
 
 func TestLoggerLevel(t *testing.T) {
 	buf := &bytes.Buffer{}
-	logger := NewLogger(buf, LogLevelWarn)
+	l := New(buf, LevelWarn)
 
-	logger.Debug("", "debug message")
-	logger.Info("", "info message")
-	logger.Warn("", "warn message")
-	logger.Error("", "error message")
+	l.Debug("", "debug message")
+	l.Info("", "info message")
+	l.Warn("", "warn message")
+	l.Error("", "error message")
 
 	output := buf.String()
 
@@ -80,16 +80,16 @@ func TestLoggerLevel(t *testing.T) {
 
 func TestLoggerSetLevel(t *testing.T) {
 	buf := &bytes.Buffer{}
-	logger := NewLogger(buf, LogLevelError)
+	l := New(buf, LevelError)
 
-	logger.Info("", "should not appear")
+	l.Info("", "should not appear")
 
 	if strings.Contains(buf.String(), "should not appear") {
 		t.Error("INFO should be filtered at ERROR level")
 	}
 
-	logger.SetLevel(LogLevelInfo)
-	logger.Info("", "should appear")
+	l.SetLevel(LevelInfo)
+	l.Info("", "should appear")
 
 	if !strings.Contains(buf.String(), "should appear") {
 		t.Error("INFO should appear after SetLevel")
@@ -98,9 +98,9 @@ func TestLoggerSetLevel(t *testing.T) {
 
 func TestLoggerWithoutNodeID(t *testing.T) {
 	buf := &bytes.Buffer{}
-	logger := NewLogger(buf, LogLevelInfo)
+	l := New(buf, LevelInfo)
 
-	logger.Info("", "message without node")
+	l.Info("", "message without node")
 
 	output := buf.String()
 
@@ -115,9 +115,9 @@ func TestLoggerWithoutNodeID(t *testing.T) {
 
 func TestLoggerFormatArgs(t *testing.T) {
 	buf := &bytes.Buffer{}
-	logger := NewLogger(buf, LogLevelInfo)
+	l := New(buf, LevelInfo)
 
-	logger.Info("node-1", "count: %d, name: %s", 42, "test")
+	l.Info("node-1", "count: %d, name: %s", 42, "test")
 
 	output := buf.String()
 
