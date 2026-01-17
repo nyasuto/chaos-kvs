@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"chaos-kvs/internal/api"
 	"chaos-kvs/internal/config"
 	"chaos-kvs/internal/logger"
 	"chaos-kvs/internal/scenario"
@@ -31,6 +32,8 @@ func main() {
 		enableRecovery = flag.Bool("recovery", true, "自動復旧を有効化")
 		listPresets    = flag.Bool("list-presets", false, "利用可能なプリセットを表示")
 		showVersion    = flag.Bool("version", false, "バージョンを表示")
+		serverMode     = flag.Bool("server", false, "Web UI サーバーモードで起動")
+		serverAddr     = flag.String("addr", ":8080", "サーバーアドレス (例: :8080, 0.0.0.0:3000)")
 	)
 
 	flag.Usage = func() {
@@ -55,6 +58,12 @@ Examples:
 
   # プリセット一覧を表示
   chaos-kvs --list-presets
+
+  # Web UIサーバーモードで起動
+  chaos-kvs --server
+
+  # カスタムアドレスでサーバー起動
+  chaos-kvs --server --addr :3000
 `)
 	}
 
@@ -69,6 +78,15 @@ Examples:
 	// プリセット一覧表示
 	if *listPresets {
 		printPresets()
+		return
+	}
+
+	// Web UIサーバーモード
+	if *serverMode {
+		if err := runServer(*serverAddr); err != nil {
+			logger.Error("", "サーバーエラー: %v", err)
+			os.Exit(1)
+		}
 		return
 	}
 
@@ -198,4 +216,29 @@ func printPresets() {
 
 	fmt.Println()
 	fmt.Println("使用例: chaos-kvs --preset quick")
+}
+
+// runServer はWeb UIサーバーを起動する
+func runServer(addr string) error {
+	fmt.Println("ChaosKVS - Web UI Server")
+	fmt.Println("========================")
+	fmt.Printf("Starting server on http://%s\n", addr)
+	fmt.Println("Press Ctrl+C to stop")
+	fmt.Println()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// シグナルハンドリング
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-sigCh
+		fmt.Println("\n中断シグナルを受信、サーバーを終了中...")
+		cancel()
+	}()
+
+	server := api.NewServer(addr)
+	return server.Start(ctx)
 }

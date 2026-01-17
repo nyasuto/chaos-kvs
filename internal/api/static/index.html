@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChaosKVS Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+        }
+        .header {
+            background: #16213e;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #0f3460;
+        }
+        .header h1 {
+            font-size: 1.5rem;
+            color: #e94560;
+        }
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: bold;
+        }
+        .status-badge.running {
+            background: #10b981;
+            color: white;
+        }
+        .status-badge.stopped {
+            background: #6b7280;
+            color: white;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .card {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid #0f3460;
+        }
+        .card h2 {
+            font-size: 0.875rem;
+            color: #9ca3af;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .card .value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #e94560;
+        }
+        .card .value.green { color: #10b981; }
+        .card .value.yellow { color: #f59e0b; }
+        .card .value.red { color: #ef4444; }
+        .section {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid #0f3460;
+        }
+        .section h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: #e94560;
+        }
+        .controls {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        select, input {
+            background: #1a1a2e;
+            border: 1px solid #0f3460;
+            color: #eee;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+        select:focus, input:focus {
+            outline: none;
+            border-color: #e94560;
+        }
+        button {
+            background: #e94560;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #d63850;
+        }
+        button:disabled {
+            background: #6b7280;
+            cursor: not-allowed;
+        }
+        button.secondary {
+            background: #0f3460;
+        }
+        button.secondary:hover {
+            background: #16213e;
+        }
+        .nodes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+        .node {
+            background: #1a1a2e;
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+            border: 2px solid transparent;
+        }
+        .node.running { border-color: #10b981; }
+        .node.stopped { border-color: #ef4444; }
+        .node.suspended { border-color: #f59e0b; }
+        .node .id {
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        .node .status {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .node .status.running { color: #10b981; }
+        .node .status.stopped { color: #ef4444; }
+        .node .status.suspended { color: #f59e0b; }
+        .log {
+            background: #0d1117;
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.875rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            padding: 0.25rem 0;
+            border-bottom: 1px solid #1a1a2e;
+        }
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+        .log-entry .time {
+            color: #6b7280;
+            margin-right: 0.5rem;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>ChaosKVS Dashboard</h1>
+        <span id="statusBadge" class="status-badge stopped">Stopped</span>
+    </header>
+
+    <div class="container">
+        <div class="grid">
+            <div class="card">
+                <h2>Total Requests</h2>
+                <div id="totalRequests" class="value">0</div>
+            </div>
+            <div class="card">
+                <h2>RPS</h2>
+                <div id="rps" class="value green">0</div>
+            </div>
+            <div class="card">
+                <h2>Error Rate</h2>
+                <div id="errorRate" class="value green">0%</div>
+            </div>
+            <div class="card">
+                <h2>Avg Latency</h2>
+                <div id="avgLatency" class="value">0ms</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Scenario Control</h2>
+            <div class="controls">
+                <select id="presetSelect">
+                    <option value="quick">Quick (5s)</option>
+                    <option value="basic">Basic</option>
+                    <option value="resilience">Resilience</option>
+                    <option value="latency">Latency</option>
+                    <option value="stress">Stress</option>
+                </select>
+                <input type="text" id="duration" placeholder="Duration (e.g. 10s)" style="width: 150px;">
+                <input type="number" id="nodes" placeholder="Nodes" min="1" max="20" style="width: 100px;">
+                <button id="startBtn" onclick="startScenario()">Start</button>
+                <button id="stopBtn" class="secondary" onclick="stopScenario()" disabled>Stop</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Nodes</h2>
+            <div id="nodesGrid" class="nodes-grid">
+                <div class="node">
+                    <div class="id">-</div>
+                    <div class="status">No nodes</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Activity Log</h2>
+            <div id="log" class="log">
+                <div class="log-entry">
+                    <span class="time">--:--:--</span>
+                    <span>Waiting for scenario...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let isRunning = false;
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+            ws.onopen = () => {
+                addLog('WebSocket connected');
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleMessage(data);
+            };
+
+            ws.onclose = () => {
+                addLog('WebSocket disconnected, reconnecting...');
+                setTimeout(connectWebSocket, 3000);
+            };
+
+            ws.onerror = (err) => {
+                console.error('WebSocket error:', err);
+            };
+        }
+
+        function handleMessage(data) {
+            if (data.type === 'status') {
+                updateStatus(data.status);
+            } else if (data.type === 'scenario_complete') {
+                isRunning = false;
+                updateUI();
+                if (data.result) {
+                    addLog(`Scenario completed: ${data.result.TotalRequests} requests`);
+                }
+            }
+        }
+
+        function updateStatus(status) {
+            isRunning = status.running;
+            updateUI();
+
+            if (status.scenario_name) {
+                document.getElementById('statusBadge').textContent = status.scenario_name;
+            }
+        }
+
+        function updateUI() {
+            const badge = document.getElementById('statusBadge');
+            const startBtn = document.getElementById('startBtn');
+            const stopBtn = document.getElementById('stopBtn');
+
+            if (isRunning) {
+                badge.className = 'status-badge running pulse';
+                badge.textContent = 'Running';
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+            } else {
+                badge.className = 'status-badge stopped';
+                badge.textContent = 'Stopped';
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+            }
+        }
+
+        async function startScenario() {
+            const preset = document.getElementById('presetSelect').value;
+            const duration = document.getElementById('duration').value;
+            const nodes = document.getElementById('nodes').value;
+
+            const body = { preset };
+            if (duration) body.duration = duration;
+            if (nodes) body.nodes = parseInt(nodes);
+
+            try {
+                const resp = await fetch('/api/scenario/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                if (resp.ok) {
+                    const data = await resp.json();
+                    addLog(`Scenario started: ${data.scenario}`);
+                    isRunning = true;
+                    updateUI();
+                    pollNodes();
+                } else {
+                    const err = await resp.text();
+                    addLog(`Error: ${err}`);
+                }
+            } catch (err) {
+                addLog(`Error: ${err.message}`);
+            }
+        }
+
+        async function stopScenario() {
+            try {
+                const resp = await fetch('/api/scenario/stop', {
+                    method: 'POST'
+                });
+                if (resp.ok) {
+                    addLog('Stop requested');
+                }
+            } catch (err) {
+                addLog(`Error: ${err.message}`);
+            }
+        }
+
+        async function pollNodes() {
+            if (!isRunning) return;
+
+            try {
+                const resp = await fetch('/api/nodes');
+                if (resp.ok) {
+                    const nodes = await resp.json();
+                    renderNodes(nodes);
+                }
+            } catch (err) {
+                console.error('Failed to fetch nodes:', err);
+            }
+
+            if (isRunning) {
+                setTimeout(pollNodes, 1000);
+            }
+        }
+
+        function renderNodes(nodes) {
+            const grid = document.getElementById('nodesGrid');
+
+            if (!nodes || nodes.length === 0) {
+                grid.innerHTML = '<div class="node"><div class="id">-</div><div class="status">No nodes</div></div>';
+                return;
+            }
+
+            grid.innerHTML = nodes.map(n => `
+                <div class="node ${n.status.toLowerCase()}">
+                    <div class="id">${n.id}</div>
+                    <div class="status ${n.status.toLowerCase()}">${n.status}</div>
+                    ${n.delay ? `<div style="font-size: 0.75rem; color: #f59e0b;">+${n.delay}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function addLog(message) {
+            const log = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="time">${time}</span><span>${message}</span>`;
+            log.insertBefore(entry, log.firstChild);
+
+            // Keep only last 50 entries
+            while (log.children.length > 50) {
+                log.removeChild(log.lastChild);
+            }
+        }
+
+        // Initial load
+        async function init() {
+            try {
+                const resp = await fetch('/api/status');
+                if (resp.ok) {
+                    const status = await resp.json();
+                    updateStatus(status);
+                    if (status.running) {
+                        pollNodes();
+                    }
+                }
+            } catch (err) {
+                addLog('Failed to connect to server');
+            }
+
+            connectWebSocket();
+        }
+
+        init();
+    </script>
+</body>
+</html>
