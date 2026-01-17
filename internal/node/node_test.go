@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestNewNode(t *testing.T) {
@@ -165,4 +166,94 @@ func TestNodeConcurrentAccess(t *testing.T) {
 	}
 
 	wg.Wait()
+}
+
+func TestNodeSuspendResume(t *testing.T) {
+	n := New("test-node-1")
+	ctx := context.Background()
+
+	// Suspend before start should fail
+	if err := n.Suspend(); err == nil {
+		t.Error("expected error when suspending stopped node")
+	}
+
+	// Start node
+	_ = n.Start(ctx)
+
+	// Suspend
+	if err := n.Suspend(); err != nil {
+		t.Errorf("failed to suspend node: %v", err)
+	}
+
+	if n.Status() != StatusSuspended {
+		t.Errorf("expected status Suspended, got %v", n.Status())
+	}
+
+	// Double suspend should fail
+	if err := n.Suspend(); err == nil {
+		t.Error("expected error when suspending already suspended node")
+	}
+
+	// Operations on suspended node should fail/return empty
+	if _, ok := n.Get("key1"); ok {
+		t.Error("expected Get to return false on suspended node")
+	}
+	if err := n.Set("key1", []byte("value1")); err == nil {
+		t.Error("expected error when setting on suspended node")
+	}
+
+	// Resume
+	if err := n.Resume(); err != nil {
+		t.Errorf("failed to resume node: %v", err)
+	}
+
+	if n.Status() != StatusRunning {
+		t.Errorf("expected status Running after resume, got %v", n.Status())
+	}
+
+	// Double resume should fail
+	if err := n.Resume(); err == nil {
+		t.Error("expected error when resuming non-suspended node")
+	}
+
+	// Operations should work again
+	if err := n.Set("key1", []byte("value1")); err != nil {
+		t.Errorf("expected Set to succeed after resume: %v", err)
+	}
+}
+
+func TestNodeDelay(t *testing.T) {
+	n := New("test-node-1")
+	ctx := context.Background()
+	_ = n.Start(ctx)
+
+	// Initially no delay
+	if n.Delay() != 0 {
+		t.Errorf("expected no delay initially, got %v", n.Delay())
+	}
+
+	// Set delay
+	delay := 50 * time.Millisecond
+	n.SetDelay(delay)
+
+	if n.Delay() != delay {
+		t.Errorf("expected delay %v, got %v", delay, n.Delay())
+	}
+
+	// Verify delay is applied
+	_ = n.Set("key1", []byte("value1"))
+
+	start := time.Now()
+	n.Get("key1")
+	elapsed := time.Since(start)
+
+	if elapsed < delay {
+		t.Errorf("expected delay of at least %v, got %v", delay, elapsed)
+	}
+
+	// Clear delay
+	n.SetDelay(0)
+	if n.Delay() != 0 {
+		t.Error("expected delay to be cleared")
+	}
 }

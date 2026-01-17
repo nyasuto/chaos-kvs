@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"chaos-kvs/internal/logger"
 )
@@ -46,6 +47,7 @@ func (s Status) String() string {
 type Node struct {
 	id     string
 	status Status
+	delay  time.Duration
 
 	mu   sync.RWMutex
 	data map[string][]byte
@@ -109,8 +111,64 @@ func (n *Node) Status() Status {
 	return n.status
 }
 
+// Suspend はノードを一時停止する
+func (n *Node) Suspend() error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if n.status != StatusRunning {
+		return fmt.Errorf("node %s is not running", n.id)
+	}
+
+	n.status = StatusSuspended
+	logger.Info(n.id, "Node suspended")
+	return nil
+}
+
+// Resume は一時停止中のノードを再開する
+func (n *Node) Resume() error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if n.status != StatusSuspended {
+		return fmt.Errorf("node %s is not suspended", n.id)
+	}
+
+	n.status = StatusRunning
+	logger.Info(n.id, "Node resumed")
+	return nil
+}
+
+// SetDelay はレスポンス遅延を設定する
+func (n *Node) SetDelay(d time.Duration) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.delay = d
+	if d > 0 {
+		logger.Info(n.id, "Delay set to %v", d)
+	} else {
+		logger.Info(n.id, "Delay cleared")
+	}
+}
+
+// Delay は現在の遅延設定を返す
+func (n *Node) Delay() time.Duration {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.delay
+}
+
+// applyDelay は設定された遅延を適用する
+func (n *Node) applyDelay() {
+	if d := n.Delay(); d > 0 {
+		time.Sleep(d)
+	}
+}
+
 // Get はキーに対応する値を取得する
 func (n *Node) Get(key string) ([]byte, bool) {
+	n.applyDelay()
+
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
@@ -124,6 +182,8 @@ func (n *Node) Get(key string) ([]byte, bool) {
 
 // Set はキーに値を設定する
 func (n *Node) Set(key string, value []byte) error {
+	n.applyDelay()
+
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
