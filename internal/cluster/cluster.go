@@ -10,6 +10,21 @@ import (
 	"chaos-kvs/internal/node"
 )
 
+// Manager はクラスタ管理の基本操作を定義するインターフェース
+type Manager interface {
+	AddNode(n *node.Node) error
+	RemoveNode(nodeID string) error
+	GetNode(nodeID string) (*node.Node, bool)
+	Nodes() []*node.Node
+	StartAll(ctx context.Context) error
+	StopAll() error
+	Size() int
+	RunningCount() int
+}
+
+// Ensure Cluster implements Manager
+var _ Manager = (*Cluster)(nil)
+
 // Cluster は複数のノードを管理する
 type Cluster struct {
 	mu    sync.RWMutex
