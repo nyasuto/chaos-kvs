@@ -1,4 +1,3 @@
-// Package client provides a load generator for stress testing the cluster.
 package client
 
 import (
