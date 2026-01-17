@@ -1,4 +1,3 @@
-// Package cluster provides multi-node cluster management.
 package cluster
 
 import (

@@ -1,4 +1,3 @@
-// Package node provides an in-memory key-value store node implementation.
 package node
 
 import (

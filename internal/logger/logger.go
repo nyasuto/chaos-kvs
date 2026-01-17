@@ -1,4 +1,3 @@
-// Package logger provides thread-safe logging functionality.
 package logger
 
 import (

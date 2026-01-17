@@ -1,4 +1,3 @@
-// Package worker provides a goroutine pool for concurrent job execution.
 package worker
 
 import (

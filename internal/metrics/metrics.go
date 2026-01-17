@@ -1,4 +1,3 @@
-// Package metrics provides request metrics collection and reporting.
 package metrics
 
 import (
