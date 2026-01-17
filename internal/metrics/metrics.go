@@ -20,6 +20,18 @@ type Collector interface {
 // Ensure Metrics implements Collector
 var _ Collector = (*Metrics)(nil)
 
+// Config はメトリクスの設定
+type Config struct {
+	MaxLatencySamples int // P99計算用のサンプル数
+}
+
+// DefaultConfig はデフォルト設定を返す
+func DefaultConfig() Config {
+	return Config{
+		MaxLatencySamples: 1000,
+	}
+}
+
 // Metrics はリクエストのメトリクスを収集する
 type Metrics struct {
 	totalRequests   atomic.Uint64
@@ -37,12 +49,21 @@ type Metrics struct {
 
 // New は新しいメトリクスを作成する
 func New() *Metrics {
+	return NewWithConfig(DefaultConfig())
+}
+
+// NewWithConfig は設定を指定してメトリクスを作成する
+func NewWithConfig(config Config) *Metrics {
+	maxSamples := config.MaxLatencySamples
+	if maxSamples <= 0 {
+		maxSamples = 1000
+	}
 	now := time.Now()
 	return &Metrics{
 		startTime:         now,
 		lastResetTime:     now,
-		latencies:         make([]time.Duration, 0, 1000),
-		maxLatencySamples: 1000,
+		latencies:         make([]time.Duration, 0, maxSamples),
+		maxLatencySamples: maxSamples,
 	}
 }
 
