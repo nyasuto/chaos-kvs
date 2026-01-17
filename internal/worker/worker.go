@@ -1,16 +1,19 @@
-package main
+// Package worker provides a goroutine pool for concurrent job execution.
+package worker
 
 import (
 	"context"
 	"runtime"
 	"sync"
+
+	"chaos-kvs/internal/logger"
 )
 
 // Job はワーカーが実行するジョブを表す
 type Job func()
 
-// WorkerPool はゴルーチンのプールを管理する
-type WorkerPool struct {
+// Pool はゴルーチンのプールを管理する
+type Pool struct {
 	numWorkers int
 	jobs       chan Job
 	wg         sync.WaitGroup
@@ -20,20 +23,20 @@ type WorkerPool struct {
 	mu         sync.Mutex
 }
 
-// NewWorkerPool は新しいワーカープールを作成する
+// NewPool は新しいワーカープールを作成する
 // numWorkers が 0 の場合は CPU 数を使用
-func NewWorkerPool(numWorkers int) *WorkerPool {
+func NewPool(numWorkers int) *Pool {
 	if numWorkers <= 0 {
 		numWorkers = runtime.NumCPU()
 	}
-	return &WorkerPool{
+	return &Pool{
 		numWorkers: numWorkers,
 		jobs:       make(chan Job, numWorkers*100),
 	}
 }
 
 // Start はワーカープールを起動する
-func (p *WorkerPool) Start(ctx context.Context) {
+func (p *Pool) Start(ctx context.Context) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -49,11 +52,11 @@ func (p *WorkerPool) Start(ctx context.Context) {
 		go p.worker(i)
 	}
 
-	LogInfo("", "WorkerPool started with %d workers", p.numWorkers)
+	logger.Info("", "WorkerPool started with %d workers", p.numWorkers)
 }
 
 // worker は個々のワーカーゴルーチン
-func (p *WorkerPool) worker(_ int) {
+func (p *Pool) worker(_ int) {
 	defer p.wg.Done()
 
 	for {
@@ -70,7 +73,7 @@ func (p *WorkerPool) worker(_ int) {
 }
 
 // Submit はジョブをプールに送信する
-func (p *WorkerPool) Submit(job Job) (submitted bool) {
+func (p *Pool) Submit(job Job) (submitted bool) {
 	defer func() {
 		if recover() != nil {
 			submitted = false
@@ -86,7 +89,7 @@ func (p *WorkerPool) Submit(job Job) (submitted bool) {
 }
 
 // SubmitWait はジョブを送信し、キューに空きがなければブロックする
-func (p *WorkerPool) SubmitWait(job Job) bool {
+func (p *Pool) SubmitWait(job Job) bool {
 	select {
 	case <-p.ctx.Done():
 		return false
@@ -102,7 +105,7 @@ func (p *WorkerPool) SubmitWait(job Job) bool {
 }
 
 // Stop はワーカープールを停止する
-func (p *WorkerPool) Stop() {
+func (p *Pool) Stop() {
 	p.mu.Lock()
 	if !p.started {
 		p.mu.Unlock()
@@ -118,15 +121,15 @@ func (p *WorkerPool) Stop() {
 	p.started = false
 	p.mu.Unlock()
 
-	LogInfo("", "WorkerPool stopped")
+	logger.Info("", "WorkerPool stopped")
 }
 
 // NumWorkers はワーカー数を返す
-func (p *WorkerPool) NumWorkers() int {
+func (p *Pool) NumWorkers() int {
 	return p.numWorkers
 }
 
 // QueueSize は現在のキューサイズを返す
-func (p *WorkerPool) QueueSize() int {
+func (p *Pool) QueueSize() int {
 	return len(p.jobs)
 }

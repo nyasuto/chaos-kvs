@@ -1,4 +1,4 @@
-package main
+package node
 
 import (
 	"context"
@@ -7,74 +7,74 @@ import (
 )
 
 func TestNewNode(t *testing.T) {
-	node := NewNode("test-node-1")
+	n := New("test-node-1")
 
-	if node.ID != "test-node-1" {
-		t.Errorf("expected ID 'test-node-1', got '%s'", node.ID)
+	if n.ID() != "test-node-1" {
+		t.Errorf("expected ID 'test-node-1', got '%s'", n.ID())
 	}
 
-	if node.Status() != NodeStatusStopped {
-		t.Errorf("expected status Stopped, got %v", node.Status())
+	if n.Status() != StatusStopped {
+		t.Errorf("expected status Stopped, got %v", n.Status())
 	}
 }
 
 func TestNodeStartStop(t *testing.T) {
-	node := NewNode("test-node-1")
+	n := New("test-node-1")
 	ctx := context.Background()
 
 	// Start
-	if err := node.Start(ctx); err != nil {
+	if err := n.Start(ctx); err != nil {
 		t.Errorf("failed to start node: %v", err)
 	}
 
-	if node.Status() != NodeStatusRunning {
-		t.Errorf("expected status Running, got %v", node.Status())
+	if n.Status() != StatusRunning {
+		t.Errorf("expected status Running, got %v", n.Status())
 	}
 
 	// Double start should fail
-	if err := node.Start(ctx); err == nil {
+	if err := n.Start(ctx); err == nil {
 		t.Error("expected error when starting already running node")
 	}
 
 	// Stop
-	if err := node.Stop(); err != nil {
+	if err := n.Stop(); err != nil {
 		t.Errorf("failed to stop node: %v", err)
 	}
 
-	if node.Status() != NodeStatusStopped {
-		t.Errorf("expected status Stopped, got %v", node.Status())
+	if n.Status() != StatusStopped {
+		t.Errorf("expected status Stopped, got %v", n.Status())
 	}
 
 	// Double stop should fail
-	if err := node.Stop(); err == nil {
+	if err := n.Stop(); err == nil {
 		t.Error("expected error when stopping already stopped node")
 	}
 }
 
 func TestNodeGetSet(t *testing.T) {
-	node := NewNode("test-node-1")
+	n := New("test-node-1")
 	ctx := context.Background()
 
 	// Set before start should fail
-	if err := node.Set("key1", []byte("value1")); err == nil {
+	if err := n.Set("key1", []byte("value1")); err == nil {
 		t.Error("expected error when setting on stopped node")
 	}
 
 	// Get before start should return false
-	if _, ok := node.Get("key1"); ok {
+	if _, ok := n.Get("key1"); ok {
 		t.Error("expected Get to return false on stopped node")
 	}
 
 	// Start node
-	_ = node.Start(ctx)
+	_ = n.Start(ctx)
 
 	// Set
-	if err := node.Set("key1", []byte("value1")); err != nil {
+	if err := n.Set("key1", []byte("value1")); err != nil {
 		t.Errorf("failed to set: %v", err)
 	}
 
 	// Get
-	value, ok := node.Get("key1")
+	value, ok := n.Get("key1")
 	if !ok {
 		t.Error("expected Get to return true")
 	}
@@ -83,63 +83,63 @@ func TestNodeGetSet(t *testing.T) {
 	}
 
 	// Get non-existent key
-	if _, ok := node.Get("nonexistent"); ok {
+	if _, ok := n.Get("nonexistent"); ok {
 		t.Error("expected Get to return false for non-existent key")
 	}
 }
 
 func TestNodeDelete(t *testing.T) {
-	node := NewNode("test-node-1")
+	n := New("test-node-1")
 	ctx := context.Background()
-	_ = node.Start(ctx)
+	_ = n.Start(ctx)
 
-	_ = node.Set("key1", []byte("value1"))
+	_ = n.Set("key1", []byte("value1"))
 
-	if err := node.Delete("key1"); err != nil {
+	if err := n.Delete("key1"); err != nil {
 		t.Errorf("failed to delete: %v", err)
 	}
 
-	if _, ok := node.Get("key1"); ok {
+	if _, ok := n.Get("key1"); ok {
 		t.Error("expected key to be deleted")
 	}
 }
 
 func TestNodeKeys(t *testing.T) {
-	node := NewNode("test-node-1")
+	n := New("test-node-1")
 	ctx := context.Background()
-	_ = node.Start(ctx)
+	_ = n.Start(ctx)
 
-	_ = node.Set("key1", []byte("value1"))
-	_ = node.Set("key2", []byte("value2"))
-	_ = node.Set("key3", []byte("value3"))
+	_ = n.Set("key1", []byte("value1"))
+	_ = n.Set("key2", []byte("value2"))
+	_ = n.Set("key3", []byte("value3"))
 
-	keys := node.Keys()
+	keys := n.Keys()
 	if len(keys) != 3 {
 		t.Errorf("expected 3 keys, got %d", len(keys))
 	}
 }
 
 func TestNodeSize(t *testing.T) {
-	node := NewNode("test-node-1")
+	n := New("test-node-1")
 	ctx := context.Background()
-	_ = node.Start(ctx)
+	_ = n.Start(ctx)
 
-	if node.Size() != 0 {
-		t.Errorf("expected size 0, got %d", node.Size())
+	if n.Size() != 0 {
+		t.Errorf("expected size 0, got %d", n.Size())
 	}
 
-	_ = node.Set("key1", []byte("value1"))
-	_ = node.Set("key2", []byte("value2"))
+	_ = n.Set("key1", []byte("value1"))
+	_ = n.Set("key2", []byte("value2"))
 
-	if node.Size() != 2 {
-		t.Errorf("expected size 2, got %d", node.Size())
+	if n.Size() != 2 {
+		t.Errorf("expected size 2, got %d", n.Size())
 	}
 }
 
 func TestNodeConcurrentAccess(t *testing.T) {
-	node := NewNode("test-node-1")
+	n := New("test-node-1")
 	ctx := context.Background()
-	_ = node.Start(ctx)
+	_ = n.Start(ctx)
 
 	var wg sync.WaitGroup
 	numGoroutines := 100
@@ -150,7 +150,7 @@ func TestNodeConcurrentAccess(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			key := string(rune('a' + i%26))
-			_ = node.Set(key, []byte("value"))
+			_ = n.Set(key, []byte("value"))
 		}(i)
 	}
 
@@ -160,7 +160,7 @@ func TestNodeConcurrentAccess(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			key := string(rune('a' + i%26))
-			node.Get(key)
+			n.Get(key)
 		}(i)
 	}
 

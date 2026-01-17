@@ -1,13 +1,15 @@
-package main
+package client
 
 import (
 	"context"
 	"testing"
 	"time"
+
+	"chaos-kvs/internal/cluster"
 )
 
 func TestDefaultClientConfig(t *testing.T) {
-	config := DefaultClientConfig()
+	config := DefaultConfig()
 
 	if config.WriteRatio != 0.5 {
 		t.Errorf("expected WriteRatio 0.5, got %f", config.WriteRatio)
@@ -18,9 +20,9 @@ func TestDefaultClientConfig(t *testing.T) {
 }
 
 func TestNewClient(t *testing.T) {
-	cluster := NewCluster()
-	config := DefaultClientConfig()
-	client := NewClient(cluster, config)
+	c := cluster.New()
+	config := DefaultConfig()
+	client := New(c, config)
 
 	if client.IsRunning() {
 		t.Error("expected client to not be running initially")
@@ -28,14 +30,14 @@ func TestNewClient(t *testing.T) {
 }
 
 func TestClientStartStop(t *testing.T) {
-	cluster := NewCluster()
-	_ = cluster.CreateNodes(3, "node")
+	c := cluster.New()
+	_ = c.CreateNodes(3, "node")
 	ctx := context.Background()
-	_ = cluster.StartAll(ctx)
-	defer func() { _ = cluster.StopAll() }()
+	_ = c.StartAll(ctx)
+	defer func() { _ = c.StopAll() }()
 
-	config := DefaultClientConfig()
-	client := NewClient(cluster, config)
+	config := DefaultConfig()
+	client := New(c, config)
 
 	client.Start(ctx)
 	if !client.IsRunning() {
@@ -57,14 +59,14 @@ func TestClientStartStop(t *testing.T) {
 }
 
 func TestClientRunFor(t *testing.T) {
-	cluster := NewCluster()
-	_ = cluster.CreateNodes(3, "node")
+	c := cluster.New()
+	_ = c.CreateNodes(3, "node")
 	ctx := context.Background()
-	_ = cluster.StartAll(ctx)
-	defer func() { _ = cluster.StopAll() }()
+	_ = c.StartAll(ctx)
+	defer func() { _ = c.StopAll() }()
 
-	config := DefaultClientConfig()
-	client := NewClient(cluster, config)
+	config := DefaultConfig()
+	client := New(c, config)
 
 	snapshot := client.RunFor(ctx, 100*time.Millisecond)
 
@@ -77,15 +79,15 @@ func TestClientRunFor(t *testing.T) {
 }
 
 func TestClientRunRequests(t *testing.T) {
-	cluster := NewCluster()
-	_ = cluster.CreateNodes(3, "node")
+	c := cluster.New()
+	_ = c.CreateNodes(3, "node")
 	ctx := context.Background()
-	_ = cluster.StartAll(ctx)
-	defer func() { _ = cluster.StopAll() }()
+	_ = c.StartAll(ctx)
+	defer func() { _ = c.StopAll() }()
 
-	config := DefaultClientConfig()
+	config := DefaultConfig()
 	config.RequestsLimit = 100
-	client := NewClient(cluster, config)
+	client := New(c, config)
 
 	snapshot := client.RunRequests(ctx, 100)
 
@@ -96,9 +98,9 @@ func TestClientRunRequests(t *testing.T) {
 }
 
 func TestClientWithNoNodes(t *testing.T) {
-	cluster := NewCluster()
-	config := DefaultClientConfig()
-	client := NewClient(cluster, config)
+	c := cluster.New()
+	config := DefaultConfig()
+	client := New(c, config)
 
 	ctx := context.Background()
 	client.Start(ctx)

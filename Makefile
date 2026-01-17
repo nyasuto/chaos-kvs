@@ -5,7 +5,7 @@ BINARY=chaos-kvs
 
 # Build the application
 build:
-	go build -o $(BINARY) .
+	go build -o $(BINARY) ./cmd/chaos-kvs
 
 # Run tests
 test:

@@ -1,4 +1,4 @@
-package main
+package worker
 
 import (
 	"context"
@@ -9,20 +9,20 @@ import (
 )
 
 func TestNewWorkerPool(t *testing.T) {
-	pool := NewWorkerPool(4)
+	pool := NewPool(4)
 	if pool.NumWorkers() != 4 {
 		t.Errorf("expected 4 workers, got %d", pool.NumWorkers())
 	}
 
 	// Zero should default to CPU count
-	pool2 := NewWorkerPool(0)
+	pool2 := NewPool(0)
 	if pool2.NumWorkers() != runtime.NumCPU() {
 		t.Errorf("expected %d workers, got %d", runtime.NumCPU(), pool2.NumWorkers())
 	}
 }
 
 func TestWorkerPoolStartStop(t *testing.T) {
-	pool := NewWorkerPool(2)
+	pool := NewPool(2)
 	ctx := context.Background()
 
 	pool.Start(ctx)
@@ -35,7 +35,7 @@ func TestWorkerPoolStartStop(t *testing.T) {
 }
 
 func TestWorkerPoolSubmit(t *testing.T) {
-	pool := NewWorkerPool(2)
+	pool := NewPool(2)
 	ctx := context.Background()
 	pool.Start(ctx)
 	defer pool.Stop()
@@ -69,7 +69,7 @@ func TestWorkerPoolSubmit(t *testing.T) {
 }
 
 func TestWorkerPoolSubmitAfterStop(t *testing.T) {
-	pool := NewWorkerPool(2)
+	pool := NewPool(2)
 	ctx := context.Background()
 	pool.Start(ctx)
 	pool.Stop()
@@ -82,7 +82,7 @@ func TestWorkerPoolSubmitAfterStop(t *testing.T) {
 }
 
 func TestWorkerPoolQueueSize(t *testing.T) {
-	pool := NewWorkerPool(1)
+	pool := NewPool(1)
 	ctx := context.Background()
 
 	// Start but with a blocking job

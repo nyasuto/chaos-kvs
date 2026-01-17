@@ -1,6 +1,8 @@
-package main
+// Package metrics provides request metrics collection and reporting.
+package metrics
 
 import (
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -21,8 +23,8 @@ type Metrics struct {
 	maxLatencySamples int
 }
 
-// NewMetrics は新しいメトリクスを作成する
-func NewMetrics() *Metrics {
+// New は新しいメトリクスを作成する
+func New() *Metrics {
 	now := time.Now()
 	return &Metrics{
 		startTime:         now,
@@ -112,10 +114,12 @@ func (m *Metrics) P99Latency() time.Duration {
 		return 0
 	}
 
-	// コピーしてソート
+	// コピーしてソート（標準ライブラリ使用）
 	sorted := make([]time.Duration, len(m.latencies))
 	copy(sorted, m.latencies)
-	sortDurations(sorted)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i] < sorted[j]
+	})
 
 	idx := int(float64(len(sorted)) * 0.99)
 	if idx >= len(sorted) {
@@ -143,8 +147,8 @@ func (m *Metrics) Reset() {
 	m.latencies = m.latencies[:0]
 }
 
-// Snapshot はメトリクスのスナップショットを返す
-type MetricsSnapshot struct {
+// Snapshot はメトリクスのスナップショット
+type Snapshot struct {
 	TotalRequests   uint64
 	SuccessRequests uint64
 	FailedRequests  uint64
@@ -157,8 +161,8 @@ type MetricsSnapshot struct {
 }
 
 // Snapshot は現在のメトリクスのスナップショットを返す
-func (m *Metrics) Snapshot() MetricsSnapshot {
-	return MetricsSnapshot{
+func (m *Metrics) Snapshot() Snapshot {
+	return Snapshot{
 		TotalRequests:   m.TotalRequests(),
 		SuccessRequests: m.SuccessRequests(),
 		FailedRequests:  m.FailedRequests(),
@@ -168,18 +172,5 @@ func (m *Metrics) Snapshot() MetricsSnapshot {
 		P99Latency:      m.P99Latency(),
 		ErrorRate:       m.ErrorRate(),
 		Elapsed:         time.Since(m.startTime),
-	}
-}
-
-// sortDurations はDurationスライスをソートする（挿入ソート）
-func sortDurations(durations []time.Duration) {
-	for i := 1; i < len(durations); i++ {
-		key := durations[i]
-		j := i - 1
-		for j >= 0 && durations[j] > key {
-			durations[j+1] = durations[j]
-			j--
-		}
-		durations[j+1] = key
 	}
 }

@@ -1,36 +1,40 @@
-package main
+// Package cluster provides multi-node cluster management.
+package cluster
 
 import (
 	"context"
 	"fmt"
 	"sync"
+
+	"chaos-kvs/internal/logger"
+	"chaos-kvs/internal/node"
 )
 
 // Cluster は複数のノードを管理する
 type Cluster struct {
 	mu    sync.RWMutex
-	nodes map[string]*Node
+	nodes map[string]*node.Node
 	ctx   context.Context
 }
 
-// NewCluster は新しいクラスタを作成する
-func NewCluster() *Cluster {
+// New は新しいクラスタを作成する
+func New() *Cluster {
 	return &Cluster{
-		nodes: make(map[string]*Node),
+		nodes: make(map[string]*node.Node),
 	}
 }
 
 // AddNode はクラスタにノードを追加する
-func (c *Cluster) AddNode(node *Node) error {
+func (c *Cluster) AddNode(n *node.Node) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if _, exists := c.nodes[node.ID]; exists {
-		return fmt.Errorf("node %s already exists in cluster", node.ID)
+	if _, exists := c.nodes[n.ID()]; exists {
+		return fmt.Errorf("node %s already exists in cluster", n.ID())
 	}
 
-	c.nodes[node.ID] = node
-	LogInfo("", "Node %s added to cluster", node.ID)
+	c.nodes[n.ID()] = n
+	logger.Info("", "Node %s added to cluster", n.ID())
 	return nil
 }
 
@@ -39,37 +43,37 @@ func (c *Cluster) RemoveNode(nodeID string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	node, exists := c.nodes[nodeID]
+	n, exists := c.nodes[nodeID]
 	if !exists {
 		return fmt.Errorf("node %s not found in cluster", nodeID)
 	}
 
-	if node.Status() == NodeStatusRunning {
-		_ = node.Stop()
+	if n.Status() == node.StatusRunning {
+		_ = n.Stop()
 	}
 
 	delete(c.nodes, nodeID)
-	LogInfo("", "Node %s removed from cluster", nodeID)
+	logger.Info("", "Node %s removed from cluster", nodeID)
 	return nil
 }
 
 // GetNode はノードIDでノードを取得する
-func (c *Cluster) GetNode(nodeID string) (*Node, bool) {
+func (c *Cluster) GetNode(nodeID string) (*node.Node, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	node, exists := c.nodes[nodeID]
-	return node, exists
+	n, exists := c.nodes[nodeID]
+	return n, exists
 }
 
 // Nodes は全てのノードを返す
-func (c *Cluster) Nodes() []*Node {
+func (c *Cluster) Nodes() []*node.Node {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	nodes := make([]*Node, 0, len(c.nodes))
-	for _, node := range c.nodes {
-		nodes = append(nodes, node)
+	nodes := make([]*node.Node, 0, len(c.nodes))
+	for _, n := range c.nodes {
+		nodes = append(nodes, n)
 	}
 	return nodes
 }
@@ -78,25 +82,25 @@ func (c *Cluster) Nodes() []*Node {
 func (c *Cluster) StartAll(ctx context.Context) error {
 	c.mu.Lock()
 	c.ctx = ctx
-	nodes := make([]*Node, 0, len(c.nodes))
-	for _, node := range c.nodes {
-		nodes = append(nodes, node)
+	nodes := make([]*node.Node, 0, len(c.nodes))
+	for _, n := range c.nodes {
+		nodes = append(nodes, n)
 	}
 	c.mu.Unlock()
 
-	LogInfo("", "Starting all nodes in cluster (count: %d)", len(nodes))
+	logger.Info("", "Starting all nodes in cluster (count: %d)", len(nodes))
 
 	var wg sync.WaitGroup
 	errCh := make(chan error, len(nodes))
 
-	for _, node := range nodes {
+	for _, n := range nodes {
 		wg.Add(1)
-		go func(n *Node) {
+		go func(n *node.Node) {
 			defer wg.Done()
 			if err := n.Start(ctx); err != nil {
 				errCh <- err
 			}
-		}(node)
+		}(n)
 	}
 
 	wg.Wait()
@@ -108,36 +112,36 @@ func (c *Cluster) StartAll(ctx context.Context) error {
 	}
 
 	if len(errs) > 0 {
-		LogError("", "Failed to start %d nodes", len(errs))
+		logger.Error("", "Failed to start %d nodes", len(errs))
 		return fmt.Errorf("failed to start %d nodes", len(errs))
 	}
 
-	LogInfo("", "All nodes started successfully")
+	logger.Info("", "All nodes started successfully")
 	return nil
 }
 
 // StopAll は全てのノードを停止する
 func (c *Cluster) StopAll() error {
 	c.mu.RLock()
-	nodes := make([]*Node, 0, len(c.nodes))
-	for _, node := range c.nodes {
-		nodes = append(nodes, node)
+	nodes := make([]*node.Node, 0, len(c.nodes))
+	for _, n := range c.nodes {
+		nodes = append(nodes, n)
 	}
 	c.mu.RUnlock()
 
-	LogInfo("", "Stopping all nodes in cluster (count: %d)", len(nodes))
+	logger.Info("", "Stopping all nodes in cluster (count: %d)", len(nodes))
 
 	var wg sync.WaitGroup
 	errCh := make(chan error, len(nodes))
 
-	for _, node := range nodes {
+	for _, n := range nodes {
 		wg.Add(1)
-		go func(n *Node) {
+		go func(n *node.Node) {
 			defer wg.Done()
 			if err := n.Stop(); err != nil {
 				errCh <- err
 			}
-		}(node)
+		}(n)
 	}
 
 	wg.Wait()
@@ -149,10 +153,10 @@ func (c *Cluster) StopAll() error {
 	}
 
 	if len(errs) > 0 {
-		LogWarn("", "Failed to stop %d nodes (may already be stopped)", len(errs))
+		logger.Warn("", "Failed to stop %d nodes (may already be stopped)", len(errs))
 	}
 
-	LogInfo("", "All nodes stopped")
+	logger.Info("", "All nodes stopped")
 	return nil
 }
 
@@ -169,8 +173,8 @@ func (c *Cluster) RunningCount() int {
 	defer c.mu.RUnlock()
 
 	count := 0
-	for _, node := range c.nodes {
-		if node.Status() == NodeStatusRunning {
+	for _, n := range c.nodes {
+		if n.Status() == node.StatusRunning {
 			count++
 		}
 	}
@@ -183,8 +187,8 @@ func (c *Cluster) StoppedCount() int {
 	defer c.mu.RUnlock()
 
 	count := 0
-	for _, node := range c.nodes {
-		if node.Status() == NodeStatusStopped {
+	for _, n := range c.nodes {
+		if n.Status() == node.StatusStopped {
 			count++
 		}
 	}
@@ -193,16 +197,16 @@ func (c *Cluster) StoppedCount() int {
 
 // CreateNodes は指定された数のノードを作成してクラスタに追加する
 func (c *Cluster) CreateNodes(count int, prefix string) error {
-	LogInfo("", "Creating %d nodes with prefix '%s'", count, prefix)
+	logger.Info("", "Creating %d nodes with prefix '%s'", count, prefix)
 
 	for i := range count {
 		nodeID := fmt.Sprintf("%s-%d", prefix, i+1)
-		node := NewNode(nodeID)
-		if err := c.AddNode(node); err != nil {
+		n := node.New(nodeID)
+		if err := c.AddNode(n); err != nil {
 			return err
 		}
 	}
 
-	LogInfo("", "Created %d nodes successfully", count)
+	logger.Info("", "Created %d nodes successfully", count)
 	return nil
 }
