@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
 
+# The Go toolchain follows the current release rather than a version pinned
+# here. A dependency bump can raise the `go` directive in go.mod, and a pinned
+# toolchain then fails with "go.mod requires go >= X (running go Y)" on a pull
+# request that changed nothing but a dependency.
+
 jobs:
   test:
     name: Test
@@ -16,7 +21,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25'
+          go-version: 'stable'
 
       - name: Download dependencies
         run: go mod download
@@ -39,7 +44,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25'
+          go-version: 'stable'
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
@@ -55,7 +60,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25'
+          go-version: 'stable'
 
       - name: Build
         run: go build -v ./...
